@@ -8,6 +8,7 @@ import { useToast } from "@/components/ui/use-toast";
 const ImageGenerator = () => {
   const [prompt, setPrompt] = useState("");
   const [isGenerating, setIsGenerating] = useState(false);
+  const [generatedImage, setGeneratedImage] = useState<string | null>(null);
   const { toast } = useToast();
 
   const handleGenerate = async () => {
@@ -20,14 +21,34 @@ const ImageGenerator = () => {
     }
 
     setIsGenerating(true);
-    // Simulate image generation (to be implemented with actual AI service)
-    await new Promise((resolve) => setTimeout(resolve, 2000));
-    setIsGenerating(false);
-    
-    toast({
-      title: "Coming Soon!",
-      description: "Image generation will be available soon.",
-    });
+    try {
+      const response = await fetch('/api/generate-image', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ prompt: prompt.trim() }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to generate image');
+      }
+
+      const data = await response.json();
+      setGeneratedImage(data.imageUrl);
+      toast({
+        title: "Success!",
+        description: "Your image has been generated.",
+      });
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to generate image. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsGenerating(false);
+    }
   };
 
   return (
@@ -59,8 +80,16 @@ const ImageGenerator = () => {
         </Button>
       </div>
 
-      <div className="aspect-video rounded-lg border-2 border-dashed border-muted-foreground/25 flex items-center justify-center">
-        <p className="text-muted-foreground">Your generated image will appear here</p>
+      <div className="aspect-video rounded-lg border-2 border-dashed border-muted-foreground/25 flex items-center justify-center overflow-hidden">
+        {generatedImage ? (
+          <img
+            src={generatedImage}
+            alt="Generated artwork"
+            className="w-full h-full object-contain"
+          />
+        ) : (
+          <p className="text-muted-foreground">Your generated image will appear here</p>
+        )}
       </div>
     </div>
   );
