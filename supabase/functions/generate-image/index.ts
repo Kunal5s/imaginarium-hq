@@ -30,13 +30,13 @@ serve(async (req) => {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: "dall-e-3", // Explicitly specify DALL-E 3 model
+        model: "dall-e-2", // Changed to DALL-E 2 which has lower costs
         prompt,
         n: 1,
         size,
         response_format: 'url',
       }),
-    })
+    });
 
     if (!response.ok) {
       const errorData = await response.text()
