@@ -5,16 +5,16 @@ import { Check } from "lucide-react";
 const PricingSection = () => {
   const plans = [
     {
-      name: "Basic",
-      price: "$9",
-      features: ["50 generations/month", "Standard quality", "24h support"],
+      name: "Free",
+      price: "$0",
+      features: ["25 images/month", "Standard quality", "24h support"],
       popular: false,
     },
     {
-      name: "Pro",
+      name: "Premium",
       price: "$29",
       features: [
-        "200 generations/month",
+        "50 images/month",
         "High quality",
         "Priority support",
         "Custom sizes",
@@ -22,10 +22,10 @@ const PricingSection = () => {
       popular: true,
     },
     {
-      name: "Enterprise",
+      name: "Pro",
       price: "$99",
       features: [
-        "Unlimited generations",
+        "Unlimited images",
         "Maximum quality",
         "24/7 priority support",
         "API access",
@@ -80,7 +80,10 @@ const PricingSection = () => {
                   </li>
                 ))}
               </ul>
-              <Button className="mt-8" variant={plan.popular ? "default" : "outline"}>
+              <Button
+                variant={plan.popular ? "default" : "outline"}
+                className="mt-8"
+              >
                 Get Started
               </Button>
             </div>

@@ -13,7 +13,7 @@ serve(async (req) => {
   }
 
   try {
-    const { prompt } = await req.json()
+    const { prompt, size = "1024x1024" } = await req.json()
     const openAIApiKey = Deno.env.get('OPENAI_API_KEY')
 
     if (!openAIApiKey) {
@@ -29,7 +29,7 @@ serve(async (req) => {
       body: JSON.stringify({
         prompt,
         n: 1,
-        size: '1024x1024',
+        size,
         response_format: 'url',
       }),
     })
