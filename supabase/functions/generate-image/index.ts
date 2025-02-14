@@ -23,30 +23,39 @@ serve(async (req) => {
 
     console.log('Making request to OpenAI API with prompt:', prompt)
 
+    const requestBody = {
+      model: "dall-e-2",
+      prompt,
+      n: 1,
+      size,
+      response_format: 'url',
+    }
+    
+    console.log('Request body:', JSON.stringify(requestBody))
+
     const response = await fetch('https://api.openai.com/v1/images/generations', {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${openAIApiKey}`,
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({
-        model: "dall-e-2", // Changed to DALL-E 2 which has lower costs
-        prompt,
-        n: 1,
-        size,
-        response_format: 'url',
-      }),
+      body: JSON.stringify(requestBody),
     });
 
     if (!response.ok) {
       const errorData = await response.text()
-      console.error('OpenAI API error:', errorData)
+      console.error('OpenAI API error response:', errorData)
       throw new Error(`OpenAI API request failed: ${errorData}`)
     }
 
     const data = await response.json()
-    console.log('Successfully generated image')
+    console.log('Successfully generated image with response:', JSON.stringify(data))
     
+    if (!data.data?.[0]?.url) {
+      console.error('Unexpected response format:', data)
+      throw new Error('Invalid response format from OpenAI API')
+    }
+
     return new Response(
       JSON.stringify({ imageUrl: data.data[0].url }),
       {
