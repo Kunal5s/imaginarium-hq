@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Wand2 } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
+import { supabase } from "@/integrations/supabase/client";
 
 const ImageGenerator = () => {
   const [prompt, setPrompt] = useState("");
@@ -22,25 +23,19 @@ const ImageGenerator = () => {
 
     setIsGenerating(true);
     try {
-      const response = await fetch('/api/generate-image', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ prompt: prompt.trim() }),
+      const { data, error } = await supabase.functions.invoke('generate-image', {
+        body: { prompt: prompt.trim() }
       });
 
-      if (!response.ok) {
-        throw new Error('Failed to generate image');
-      }
-
-      const data = await response.json();
+      if (error) throw error;
+      
       setGeneratedImage(data.imageUrl);
       toast({
         title: "Success!",
         description: "Your image has been generated.",
       });
     } catch (error) {
+      console.error('Error generating image:', error);
       toast({
         title: "Error",
         description: "Failed to generate image. Please try again.",
