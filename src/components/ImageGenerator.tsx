@@ -1,9 +1,8 @@
-
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Wand2, ImageIcon, Settings2, AlertTriangle, Palette, BookOpen } from "lucide-react";
-import { useToast } from "@/components/ui/use-toast";
+import { Wand2, ImageIcon, Settings2, AlertTriangle, Palette, BookOpen, Save, Grid2X2, Grid3X3, Layers } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import {
   Select,
@@ -27,22 +26,28 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import { Slider } from "@/components/ui/slider";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Card, CardContent } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { useNavigate } from "react-router-dom";
+import { useAuth } from "@/hooks/useAuth";
 
 // AI Models from Hugging Face
 const AI_MODELS = [
-  { id: "stabilityai/stable-diffusion-xl-base-1.0", name: "Stable Diffusion XL 1.5+" },
-  { id: "runwayml/stable-diffusion-v1-5", name: "SD Lightning V2" },
-  { id: "prompthero/openjourney", name: "OpenJourney V4 Pro" },
-  { id: "dreamshaper/dreamshaper-xl", name: "DreamShaper XL Pro" },
-  { id: "segmind/SSD-1B", name: "SDXL Turbo Pro" },
-  { id: "stabilityai/sdxl-turbo", name: "SDXL Turbo" },
-  { id: "dataautogpt3/RealVisXL-V4", name: "RealVisXL V4.0 UHD" },
-  { id: "deepfloyd/IF-I-XL-v1.0", name: "DeepFloyd IF Ultra" },
-  { id: "lllyasviel/sd-controlnet-depth", name: "ControlNet + SDXL" },
-  { id: "playgroundai/playground-v2.5-1024px-aesthetic", name: "Playground V2.5 Ultra" },
-  { id: "julibrain/photoreal", name: "JuliBrain Photoreal" },
-  { id: "PixArt-alpha/PixArt-XL-2-1024-MS", name: "PixArt-Σ Ultra" },
-  { id: "ByteDance/FLUX-1-schnell", name: "FLUX.1-schnell MAX" },
+  { id: "stabilityai/stable-diffusion-xl-base-1.0", name: "Stable Diffusion XL 1.5+", aspectRatios: ["1:1", "16:9", "4:3", "3:2"] },
+  { id: "runwayml/stable-diffusion-v1-5", name: "SD Lightning V2", aspectRatios: ["1:1", "4:3", "3:4"] },
+  { id: "prompthero/openjourney", name: "OpenJourney V4 Pro", aspectRatios: ["1:1", "16:9"] },
+  { id: "dreamshaper/dreamshaper-xl", name: "DreamShaper XL Pro", aspectRatios: ["1:1", "16:9", "9:16"] },
+  { id: "segmind/SSD-1B", name: "SDXL Turbo Pro", aspectRatios: ["1:1", "16:9", "9:16", "4:3"] },
+  { id: "stabilityai/sdxl-turbo", name: "SDXL Turbo", aspectRatios: ["1:1", "16:9", "4:3"] },
+  { id: "dataautogpt3/RealVisXL-V4", name: "RealVisXL V4.0 UHD", aspectRatios: ["1:1", "16:9", "4:3", "3:2"] },
+  { id: "deepfloyd/IF-I-XL-v1.0", name: "DeepFloyd IF Ultra", aspectRatios: ["1:1", "16:9"] },
+  { id: "lllyasviel/sd-controlnet-depth", name: "ControlNet + SDXL", aspectRatios: ["1:1", "16:9", "4:3"] },
+  { id: "playgroundai/playground-v2.5-1024px-aesthetic", name: "Playground V2.5 Ultra", aspectRatios: ["1:1", "4:3", "3:4", "16:9"] },
+  { id: "julibrain/photoreal", name: "JuliBrain Photoreal", aspectRatios: ["1:1", "4:3", "16:9"] },
+  { id: "PixArt-alpha/PixArt-XL-2-1024-MS", name: "PixArt-Σ Ultra", aspectRatios: ["1:1", "16:9", "4:3"] },
+  { id: "ByteDance/FLUX-1-schnell", name: "FLUX.1-schnell MAX", aspectRatios: ["1:1", "16:9", "4:3", "3:2"] },
 ];
 
 // Art Style Categories and Styles
@@ -124,42 +129,119 @@ const ART_STYLE_CATEGORIES = [
   }
 ];
 
-// Function to generate images using Hugging Face API
-const generateImageWithHuggingFace = async (prompt: string, model: string, apiKey: string) => {
-  const response = await fetch(`https://api-inference.huggingface.co/models/${model}`, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({ inputs: prompt }),
-  });
+// Function to generate images using Hugging Face API with enhanced error handling
+const generateImageWithHuggingFace = async (
+  prompt: string, 
+  model: string, 
+  apiKey: string, 
+  aspectRatio: string,
+  numberOfImages: number = 1
+) => {
+  try {
+    const [width, height] = getWidthHeightFromAspectRatio(aspectRatio);
+    
+    // Create an array of promises for multiple image generation
+    const imagePromises = Array(numberOfImages).fill(0).map(async () => {
+      const response = await fetch(`https://api-inference.huggingface.co/models/${model}`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${apiKey}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ 
+          inputs: prompt,
+          parameters: {
+            width,
+            height,
+            num_inference_steps: 30,
+            guidance_scale: 7.5,
+          }
+        }),
+      });
 
-  if (!response.ok) {
-    const error = await response.json();
-    throw new Error(error.error || "Failed to generate image with Hugging Face API");
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || `Failed to generate image with model ${model}`);
+      }
+
+      const blob = await response.blob();
+      return URL.createObjectURL(blob);
+    });
+
+    // Return all generated images
+    return await Promise.all(imagePromises);
+  } catch (error) {
+    console.error("Error generating images:", error);
+    throw error;
   }
+};
 
-  const blob = await response.blob();
-  return URL.createObjectURL(blob);
+// Helper function to convert aspect ratio to width and height
+const getWidthHeightFromAspectRatio = (aspectRatio: string): [number, number] => {
+  const [widthRatio, heightRatio] = aspectRatio.split(':').map(Number);
+  
+  // Base size to maintain reasonable dimensions
+  const baseSize = 512;
+  
+  // Calculate dimensions while maintaining the aspect ratio
+  if (widthRatio > heightRatio) {
+    return [baseSize, Math.round(baseSize * (heightRatio / widthRatio))];
+  } else {
+    return [Math.round(baseSize * (widthRatio / heightRatio)), baseSize];
+  }
 };
 
 const ImageGenerator = () => {
   const [prompt, setPrompt] = useState("");
   const [isGenerating, setIsGenerating] = useState(false);
-  const [generatedImage, setGeneratedImage] = useState<string | null>(null);
+  const [generatedImages, setGeneratedImages] = useState<string[]>([]);
+  const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const [imageSize, setImageSize] = useState("1024x1024");
   const [error, setError] = useState<string | null>(null);
   const [aiModel, setAiModel] = useState("stabilityai/stable-diffusion-xl-base-1.0");
   const [artStyle, setArtStyle] = useState("");
   const [artStylesDialogOpen, setArtStylesDialogOpen] = useState(false);
   const [generationMethod, setGenerationMethod] = useState<"openai" | "huggingface">("huggingface");
+  const [aspectRatio, setAspectRatio] = useState("1:1");
+  const [numberOfImages, setNumberOfImages] = useState(1);
+  const [imageQuality, setImageQuality] = useState(7);
   const { toast } = useToast();
+  const navigate = useNavigate();
+  const { isAuthenticated } = useAuth();
+  
+  // Available aspect ratios for the selected model
+  const availableAspectRatios = AI_MODELS.find(model => model.id === aiModel)?.aspectRatios || ["1:1"];
+
+  // Set default aspect ratio when model changes
+  useEffect(() => {
+    if (availableAspectRatios.includes(aspectRatio)) return;
+    setAspectRatio(availableAspectRatios[0]);
+  }, [aiModel, availableAspectRatios]);
+
+  // Check authentication status
+  useEffect(() => {
+    if (!isAuthenticated) {
+      toast({
+        title: "Authentication Required",
+        description: "Please sign in to use the image generator",
+        variant: "destructive",
+      });
+    }
+  }, [isAuthenticated, toast]);
 
   // Hugging Face API key
   const huggingFaceApiKey = "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";
 
   const handleGenerate = async () => {
+    if (!isAuthenticated) {
+      toast({
+        title: "Authentication Required",
+        description: "Please sign in to use the image generator",
+        variant: "destructive",
+      });
+      return;
+    }
+
     if (!prompt.trim()) {
       toast({
         title: "Please enter a prompt",
@@ -176,7 +258,8 @@ const ImageGenerator = () => {
         const { data, error: supabaseError } = await supabase.functions.invoke('generate-image', {
           body: { 
             prompt: prompt.trim(),
-            size: imageSize
+            size: imageSize,
+            n: numberOfImages
           }
         });
 
@@ -184,35 +267,46 @@ const ImageGenerator = () => {
         
         if (data.error) {
           if (data.errorCode === "BILLING_LIMIT_REACHED") {
-            setError("The OpenAI account has reached its billing limit. Please contact the administrator to update the billing settings.");
+            setError("The OpenAI account has reached its billing limit. Please try Hugging Face models instead.");
             throw new Error(data.error);
           } else {
             throw new Error(data.error);
           }
         }
         
-        setGeneratedImage(data.imageUrl);
+        setGeneratedImages([data.imageUrl]);
+        setSelectedImage(data.imageUrl);
       } else {
         // Hugging Face API generation
         let enhancedPrompt = prompt.trim();
         if (artStyle) {
-          enhancedPrompt = `${enhancedPrompt}, in the style of ${artStyle}`;
+          enhancedPrompt = `${enhancedPrompt}, in the style of ${artStyle}, high quality, detailed, 8k resolution`;
         }
 
-        const imageUrl = await generateImageWithHuggingFace(enhancedPrompt, aiModel, huggingFaceApiKey);
-        setGeneratedImage(imageUrl);
+        const images = await generateImageWithHuggingFace(
+          enhancedPrompt, 
+          aiModel, 
+          huggingFaceApiKey,
+          aspectRatio,
+          numberOfImages
+        );
+        
+        setGeneratedImages(images);
+        if (images.length > 0) {
+          setSelectedImage(images[0]);
+        }
       }
 
       toast({
         title: "Success!",
-        description: "Your image has been generated.",
+        description: `${numberOfImages} image${numberOfImages > 1 ? 's' : ''} generated successfully.`,
       });
     } catch (error) {
       console.error('Error generating image:', error);
       if (!error.message?.includes("billing_limit_reached")) {
         toast({
           title: "Error",
-          description: "Failed to generate image. Please try again.",
+          description: `Failed to generate image with ${generationMethod === "openai" ? "OpenAI" : "Hugging Face"}. ${error.message}`,
           variant: "destructive",
         });
       }
@@ -230,17 +324,51 @@ const ImageGenerator = () => {
     });
   };
 
+  const saveImageToGallery = () => {
+    if (!selectedImage) return;
+    
+    // In a real app, you would save to a database
+    // For now, we'll use localStorage as a demonstration
+    const savedImages = JSON.parse(localStorage.getItem('generatedImages') || '[]');
+    if (!savedImages.includes(selectedImage)) {
+      savedImages.push(selectedImage);
+      localStorage.setItem('generatedImages', JSON.stringify(savedImages));
+      
+      toast({
+        title: "Image Saved",
+        description: "Image has been saved to your gallery",
+      });
+    }
+  };
+
   return (
-    <div className="w-full max-w-4xl mx-auto p-6 space-y-8">
+    <div className="w-full max-w-5xl mx-auto p-6 space-y-8">
       <div className="space-y-4 text-center">
-        <h2 className="text-4xl font-bold tracking-tight bg-gradient-to-r from-primary to-primary/60 bg-clip-text text-transparent">
-          AI Image Generator
+        <h2 className="text-4xl font-bold tracking-tight bg-gradient-to-r from-purple-500 via-pink-500 to-indigo-500 bg-clip-text text-transparent">
+          AI Image Generator Pro
         </h2>
         <p className="text-muted-foreground max-w-2xl mx-auto">
           Transform your ideas into stunning visuals with our advanced AI technology.
           Create unique, high-quality images in seconds.
         </p>
       </div>
+
+      {!isAuthenticated && (
+        <Alert variant="destructive" className="my-4">
+          <AlertTriangle className="h-4 w-4" />
+          <AlertTitle>Authentication Required</AlertTitle>
+          <AlertDescription>
+            You need to sign in before using the image generator.
+            <Button 
+              variant="outline" 
+              onClick={() => navigate('/login')} 
+              className="ml-2"
+            >
+              Sign In
+            </Button>
+          </AlertDescription>
+        </Alert>
+      )}
 
       {error && (
         <Alert variant="destructive" className="my-4">
@@ -250,143 +378,288 @@ const ImageGenerator = () => {
         </Alert>
       )}
 
-      <div className="space-y-4">
-        <div className="flex flex-col gap-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <Select
-              value={generationMethod}
-              onValueChange={(value: "openai" | "huggingface") => setGenerationMethod(value)}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Select generation method" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="huggingface">Hugging Face (Recommended)</SelectItem>
-                <SelectItem value="openai">OpenAI DALL-E</SelectItem>
-              </SelectContent>
-            </Select>
-            
-            {generationMethod === "huggingface" && (
+      <Tabs defaultValue="generate" className="w-full">
+        <TabsList className="grid grid-cols-2">
+          <TabsTrigger value="generate">Generate</TabsTrigger>
+          <TabsTrigger value="advanced">Advanced Settings</TabsTrigger>
+        </TabsList>
+        
+        <TabsContent value="generate" className="space-y-4">
+          <div className="flex flex-col gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <Select
-                value={aiModel}
-                onValueChange={setAiModel}
+                value={generationMethod}
+                onValueChange={(value: "openai" | "huggingface") => setGenerationMethod(value)}
               >
                 <SelectTrigger>
-                  <SelectValue placeholder="Select AI model" />
-                </SelectTrigger>
-                <SelectContent className="max-h-[200px] overflow-y-auto">
-                  {AI_MODELS.map((model) => (
-                    <SelectItem key={model.id} value={model.id}>
-                      {model.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            )}
-            
-            {generationMethod === "openai" && (
-              <Select
-                value={imageSize}
-                onValueChange={setImageSize}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select size" />
+                  <SelectValue placeholder="Select generation method" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="1024x1024">1024 × 1024</SelectItem>
-                  <SelectItem value="1024x1792">1024 × 1792</SelectItem>
-                  <SelectItem value="1792x1024">1792 × 1024</SelectItem>
+                  <SelectItem value="huggingface">Hugging Face (Recommended)</SelectItem>
+                  <SelectItem value="openai">OpenAI DALL-E</SelectItem>
                 </SelectContent>
               </Select>
-            )}
-          </div>
-          
-          <Input
-            placeholder="Describe your imagination in detail..."
-            value={prompt}
-            onChange={(e) => setPrompt(e.target.value)}
-            className="flex-1"
-          />
-
-          <div className="flex flex-col md:flex-row gap-4">
-            {generationMethod === "huggingface" && (
-              <Dialog open={artStylesDialogOpen} onOpenChange={setArtStylesDialogOpen}>
-                <DialogTrigger asChild>
-                  <Button variant="outline" className="w-full md:w-auto">
-                    <Palette className="h-4 w-4 mr-2" />
-                    {artStyle ? `Style: ${artStyle}` : "Select Art Style"}
-                  </Button>
-                </DialogTrigger>
-                <DialogContent className="max-w-3xl max-h-[80vh] overflow-y-auto">
-                  <DialogHeader>
-                    <DialogTitle>Choose an Art Style</DialogTitle>
-                    <DialogDescription>
-                      Select from over 100 unique AI art styles to enhance your image generation
-                    </DialogDescription>
-                  </DialogHeader>
-                  
-                  <Accordion type="single" collapsible className="w-full">
-                    {ART_STYLE_CATEGORIES.map((category, idx) => (
-                      <AccordionItem key={idx} value={`item-${idx}`}>
-                        <AccordionTrigger className="text-lg font-medium">
-                          {category.name}
-                        </AccordionTrigger>
-                        <AccordionContent>
-                          <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
-                            {category.styles.map((style, styleIdx) => (
-                              <Button 
-                                key={styleIdx} 
-                                variant="outline" 
-                                onClick={() => selectArtStyle(style)}
-                                className="justify-start h-auto py-2 text-sm"
-                              >
-                                {style}
-                              </Button>
-                            ))}
-                          </div>
-                        </AccordionContent>
-                      </AccordionItem>
+              
+              {generationMethod === "huggingface" && (
+                <Select
+                  value={aiModel}
+                  onValueChange={setAiModel}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select AI model" />
+                  </SelectTrigger>
+                  <SelectContent className="max-h-[200px] overflow-y-auto">
+                    {AI_MODELS.map((model) => (
+                      <SelectItem key={model.id} value={model.id}>
+                        {model.name}
+                      </SelectItem>
                     ))}
-                  </Accordion>
-                </DialogContent>
-              </Dialog>
-            )}
+                  </SelectContent>
+                </Select>
+              )}
+              
+              {generationMethod === "openai" && (
+                <Select
+                  value={imageSize}
+                  onValueChange={setImageSize}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select size" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="1024x1024">1024 × 1024</SelectItem>
+                    <SelectItem value="1024x1792">1024 × 1792</SelectItem>
+                    <SelectItem value="1792x1024">1792 × 1024</SelectItem>
+                  </SelectContent>
+                </Select>
+              )}
+            </div>
+            
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              {generationMethod === "huggingface" && (
+                <>
+                  <Select value={aspectRatio} onValueChange={setAspectRatio}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Aspect Ratio" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {availableAspectRatios.map((ratio) => (
+                        <SelectItem key={ratio} value={ratio}>
+                          {ratio} Aspect Ratio
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  
+                  <Select
+                    value={numberOfImages.toString()}
+                    onValueChange={(value) => setNumberOfImages(parseInt(value))}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Number of Images" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="1">1 Image</SelectItem>
+                      <SelectItem value="2">2 Images</SelectItem>
+                      <SelectItem value="3">3 Images</SelectItem>
+                      <SelectItem value="4">4 Images</SelectItem>
+                      <SelectItem value="6">6 Images</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </>
+              )}
+              
+              {generationMethod === "huggingface" && (
+                <Dialog open={artStylesDialogOpen} onOpenChange={setArtStylesDialogOpen}>
+                  <DialogTrigger asChild>
+                    <Button variant="outline" className="w-full md:w-auto">
+                      <Palette className="h-4 w-4 mr-2" />
+                      {artStyle ? `Style: ${artStyle}` : "Select Art Style"}
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent className="max-w-3xl max-h-[80vh] overflow-y-auto">
+                    <DialogHeader>
+                      <DialogTitle>Choose an Art Style</DialogTitle>
+                      <DialogDescription>
+                        Select from over 100 unique AI art styles to enhance your image generation
+                      </DialogDescription>
+                    </DialogHeader>
+                    
+                    <Accordion type="single" collapsible className="w-full">
+                      {ART_STYLE_CATEGORIES.map((category, idx) => (
+                        <AccordionItem key={idx} value={`item-${idx}`}>
+                          <AccordionTrigger className="text-lg font-medium">
+                            {category.name}
+                          </AccordionTrigger>
+                          <AccordionContent>
+                            <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
+                              {category.styles.map((style, styleIdx) => (
+                                <Button 
+                                  key={styleIdx} 
+                                  variant="outline" 
+                                  onClick={() => selectArtStyle(style)}
+                                  className="justify-start h-auto py-2 text-sm"
+                                >
+                                  {style}
+                                </Button>
+                              ))}
+                            </div>
+                          </AccordionContent>
+                        </AccordionItem>
+                      ))}
+                    </Accordion>
+                  </DialogContent>
+                </Dialog>
+              )}
+            </div>
+            
+            <div className="space-y-2">
+              <Input
+                placeholder="Describe your imagination in detail... (e.g., 'A magical forest with glowing mushrooms and fairies')"
+                value={prompt}
+                onChange={(e) => setPrompt(e.target.value)}
+                className="flex-1"
+              />
+              
+              {artStyle && (
+                <Badge variant="outline" className="mr-1 mb-1 p-1.5">
+                  Style: {artStyle}
+                  <Button 
+                    variant="ghost" 
+                    size="sm" 
+                    className="h-4 w-4 p-0 ml-1"
+                    onClick={() => setArtStyle("")}
+                  >
+                    ×
+                  </Button>
+                </Badge>
+              )}
+            </div>
 
             <Button
               onClick={handleGenerate}
-              disabled={isGenerating}
-              className="w-full md:w-auto relative overflow-hidden group"
+              disabled={isGenerating || !isAuthenticated}
+              className="w-full md:w-auto relative overflow-hidden group bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700"
             >
-              <span className="absolute inset-0 bg-gradient-to-r from-primary to-primary/60 opacity-0 group-hover:opacity-10 transition-opacity" />
               <span className="flex items-center gap-2">
                 <Wand2 className="h-4 w-4" />
-                {isGenerating ? "Generating..." : "Generate Image"}
+                {isGenerating ? `Generating ${numberOfImages} image${numberOfImages > 1 ? 's' : ''}...` : `Generate ${numberOfImages} Image${numberOfImages > 1 ? 's' : ''}`}
               </span>
             </Button>
           </div>
-        </div>
-      </div>
+        </TabsContent>
+        
+        <TabsContent value="advanced" className="space-y-4">
+          <Card>
+            <CardContent className="pt-6">
+              <div className="space-y-4">
+                <div>
+                  <h3 className="text-lg font-medium mb-2">Image Quality</h3>
+                  <div className="flex items-center gap-4">
+                    <span className="text-sm">Low</span>
+                    <Slider
+                      value={[imageQuality]}
+                      min={1}
+                      max={10}
+                      step={1}
+                      onValueChange={(value) => setImageQuality(value[0])}
+                      className="flex-1"
+                    />
+                    <span className="text-sm">High</span>
+                  </div>
+                </div>
+                
+                <div>
+                  <h3 className="text-lg font-medium mb-2">Tips for Better Results</h3>
+                  <ul className="list-disc list-inside space-y-1 text-sm text-muted-foreground">
+                    <li>Be detailed in your description</li>
+                    <li>Specify lighting, mood, and perspective</li>
+                    <li>Combine with art styles for unique results</li>
+                    <li>Try different AI models for varying outputs</li>
+                  </ul>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
 
-      <div className="relative aspect-square md:aspect-video rounded-lg border bg-muted/10 backdrop-blur-sm border-primary/10 flex items-center justify-center overflow-hidden">
-        {generatedImage ? (
-          <img
-            src={generatedImage}
-            alt="Generated artwork"
-            className="w-full h-full object-contain"
-          />
-        ) : (
-          <div className="flex flex-col items-center gap-2 text-muted-foreground">
-            <ImageIcon className="h-12 w-12" />
-            <p>Your generated image will appear here</p>
+      <div className="space-y-4">
+        {/* Image Results Display */}
+        {generatedImages.length > 0 && (
+          <div className="space-y-4">
+            <div className="flex justify-between items-center">
+              <h3 className="text-xl font-medium">Generated Images</h3>
+              {selectedImage && (
+                <Button 
+                  variant="outline" 
+                  onClick={saveImageToGallery}
+                  className="flex items-center gap-2"
+                >
+                  <Save className="h-4 w-4" />
+                  Save to Gallery
+                </Button>
+              )}
+            </div>
+            
+            {generatedImages.length > 1 ? (
+              <>
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                  {generatedImages.map((image, index) => (
+                    <div 
+                      key={index}
+                      className={`relative aspect-square rounded-lg border overflow-hidden ${selectedImage === image ? 'ring-2 ring-primary' : ''}`}
+                      onClick={() => setSelectedImage(image)}
+                    >
+                      <img
+                        src={image}
+                        alt={`Generated artwork ${index + 1}`}
+                        className="w-full h-full object-cover"
+                      />
+                    </div>
+                  ))}
+                </div>
+                
+                {selectedImage && (
+                  <div className="relative aspect-square md:aspect-auto md:h-[500px] rounded-lg border overflow-hidden bg-muted/10 backdrop-blur-sm border-primary/10 flex items-center justify-center">
+                    <img
+                      src={selectedImage}
+                      alt="Selected artwork"
+                      className="w-full h-full object-contain"
+                    />
+                  </div>
+                )}
+              </>
+            ) : (
+              <div className="relative aspect-square md:aspect-auto md:h-[500px] rounded-lg border overflow-hidden bg-muted/10 backdrop-blur-sm border-primary/10 flex items-center justify-center">
+                <img
+                  src={generatedImages[0]}
+                  alt="Generated artwork"
+                  className="w-full h-full object-contain"
+                />
+              </div>
+            )}
           </div>
         )}
+        
+        {generatedImages.length === 0 && !isGenerating && (
+          <div className="relative aspect-square md:aspect-video rounded-lg border bg-muted/10 backdrop-blur-sm border-primary/10 flex items-center justify-center overflow-hidden">
+            <div className="flex flex-col items-center gap-2 text-muted-foreground">
+              <ImageIcon className="h-12 w-12" />
+              <p>Your generated image will appear here</p>
+            </div>
+          </div>
+        )}
+        
         {isGenerating && (
-          <div className="absolute inset-0 bg-background/80 backdrop-blur-sm flex items-center justify-center">
-            <div className="flex flex-col items-center gap-4">
-              <div className="animate-spin">
-                <Settings2 className="h-8 w-8" />
+          <div className="relative aspect-square md:aspect-video rounded-lg border bg-muted/10 backdrop-blur-sm border-primary/10 flex items-center justify-center overflow-hidden">
+            <div className="absolute inset-0 bg-background/80 backdrop-blur-sm flex items-center justify-center">
+              <div className="flex flex-col items-center gap-4">
+                <div className="animate-spin">
+                  <Settings2 className="h-8 w-8" />
+                </div>
+                <p className="text-sm">Generating {numberOfImages} image{numberOfImages > 1 ? 's' : ''}...</p>
               </div>
-              <p className="text-sm">Generating your image...</p>
             </div>
           </div>
         )}
