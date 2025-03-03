@@ -2,7 +2,7 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Wand2, ImageIcon, Settings2 } from "lucide-react";
+import { Wand2, ImageIcon, Settings2, AlertTriangle } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import {
@@ -12,12 +12,14 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
 const ImageGenerator = () => {
   const [prompt, setPrompt] = useState("");
   const [isGenerating, setIsGenerating] = useState(false);
   const [generatedImage, setGeneratedImage] = useState<string | null>(null);
   const [imageSize, setImageSize] = useState("1024x1024");
+  const [error, setError] = useState<string | null>(null);
   const { toast } = useToast();
 
   const handleGenerate = async () => {
@@ -30,15 +32,26 @@ const ImageGenerator = () => {
     }
 
     setIsGenerating(true);
+    setError(null);
+    
     try {
-      const { data, error } = await supabase.functions.invoke('generate-image', {
+      const { data, error: supabaseError } = await supabase.functions.invoke('generate-image', {
         body: { 
           prompt: prompt.trim(),
           size: imageSize
         }
       });
 
-      if (error) throw error;
+      if (supabaseError) throw supabaseError;
+      
+      if (data.error) {
+        if (data.errorCode === "BILLING_LIMIT_REACHED") {
+          setError("The OpenAI account has reached its billing limit. Please contact the administrator to update the billing settings.");
+          throw new Error(data.error);
+        } else {
+          throw new Error(data.error);
+        }
+      }
       
       setGeneratedImage(data.imageUrl);
       toast({
@@ -47,11 +60,13 @@ const ImageGenerator = () => {
       });
     } catch (error) {
       console.error('Error generating image:', error);
-      toast({
-        title: "Error",
-        description: "Failed to generate image. Please try again.",
-        variant: "destructive",
-      });
+      if (!error.message?.includes("billing_limit_reached")) {
+        toast({
+          title: "Error",
+          description: "Failed to generate image. Please try again.",
+          variant: "destructive",
+        });
+      }
     } finally {
       setIsGenerating(false);
     }
@@ -68,6 +83,14 @@ const ImageGenerator = () => {
           Create unique, high-quality images in seconds.
         </p>
       </div>
+
+      {error && (
+        <Alert variant="destructive" className="my-4">
+          <AlertTriangle className="h-4 w-4" />
+          <AlertTitle>Error</AlertTitle>
+          <AlertDescription>{error}</AlertDescription>
+        </Alert>
+      )}
 
       <div className="space-y-4">
         <div className="flex flex-col md:flex-row gap-4">

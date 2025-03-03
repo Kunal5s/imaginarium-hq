@@ -43,9 +43,24 @@ serve(async (req) => {
     });
 
     if (!response.ok) {
-      const errorData = await response.text()
-      console.error('OpenAI API error response:', errorData)
-      throw new Error(`OpenAI API request failed: ${errorData}`)
+      const errorData = await response.json().catch(() => null) || await response.text()
+      console.error('OpenAI API error response:', typeof errorData === 'string' ? errorData : JSON.stringify(errorData))
+      
+      // Check specifically for billing errors
+      if (typeof errorData === 'object' && errorData.error?.code === 'billing_hard_limit_reached') {
+        return new Response(
+          JSON.stringify({ 
+            error: "OpenAI account billing limit reached. Please check your OpenAI account billing settings.",
+            errorCode: "BILLING_LIMIT_REACHED"
+          }),
+          {
+            status: 400, // Using 400 instead of 500 for client-side handling
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          }
+        )
+      }
+      
+      throw new Error(`OpenAI API request failed: ${typeof errorData === 'string' ? errorData : JSON.stringify(errorData)}`)
     }
 
     const data = await response.json()
