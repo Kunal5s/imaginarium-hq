@@ -10,6 +10,7 @@ interface AuthContextType {
   signup: (email: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
   loading: boolean;
+  isOnline: boolean;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -17,7 +18,22 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<any | null>(null);
   const [loading, setLoading] = useState(true);
+  const [isOnline, setIsOnline] = useState(navigator.onLine);
   const { toast } = useToast();
+
+  // Check online status
+  useEffect(() => {
+    const handleOnline = () => setIsOnline(true);
+    const handleOffline = () => setIsOnline(false);
+
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, []);
 
   useEffect(() => {
     // Check for existing session
@@ -50,6 +66,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const login = async (email: string, password: string) => {
     try {
       setLoading(true);
+      
+      if (!isOnline) {
+        throw new Error("You are offline. Please check your internet connection.");
+      }
+
       const { error } = await supabase.auth.signInWithPassword({
         email,
         password,
@@ -62,9 +83,20 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         description: "Welcome back!",
       });
     } catch (error: any) {
+      console.error("Login error:", error);
+      let errorMessage = "Login failed. Please try again.";
+      
+      if (error.message) {
+        errorMessage = error.message;
+      } else if (!isOnline) {
+        errorMessage = "You are offline. Please check your internet connection.";
+      } else if (error instanceof TypeError && error.message.includes("fetch")) {
+        errorMessage = "Connection error. Please check your internet and try again.";
+      }
+      
       toast({
         title: "Login failed",
-        description: error.message,
+        description: errorMessage,
         variant: "destructive",
       });
       throw error;
@@ -76,9 +108,17 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const signup = async (email: string, password: string) => {
     try {
       setLoading(true);
+      
+      if (!isOnline) {
+        throw new Error("You are offline. Please check your internet connection.");
+      }
+
       const { error } = await supabase.auth.signUp({
         email,
         password,
+        options: {
+          emailRedirectTo: window.location.origin,
+        }
       });
 
       if (error) throw error;
@@ -88,9 +128,20 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         description: "Please check your email for verification.",
       });
     } catch (error: any) {
+      console.error("Signup error:", error);
+      let errorMessage = "Signup failed. Please try again.";
+      
+      if (error.message) {
+        errorMessage = error.message;
+      } else if (!isOnline) {
+        errorMessage = "You are offline. Please check your internet connection.";
+      } else if (error instanceof TypeError && error.message.includes("fetch")) {
+        errorMessage = "Connection error. Please check your internet and try again.";
+      }
+      
       toast({
         title: "Signup failed",
-        description: error.message,
+        description: errorMessage,
         variant: "destructive",
       });
       throw error;
@@ -102,6 +153,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const logout = async () => {
     try {
       setLoading(true);
+      
+      if (!isOnline) {
+        throw new Error("You are offline. Please check your internet connection.");
+      }
+      
       const { error } = await supabase.auth.signOut();
       if (error) throw error;
       
@@ -110,9 +166,18 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         description: "You have been successfully logged out.",
       });
     } catch (error: any) {
+      console.error("Logout error:", error);
+      let errorMessage = "Logout failed. Please try again.";
+      
+      if (error.message) {
+        errorMessage = error.message;
+      } else if (!isOnline) {
+        errorMessage = "You are offline. Please check your internet connection.";
+      }
+      
       toast({
         title: "Logout failed",
-        description: error.message,
+        description: errorMessage,
         variant: "destructive",
       });
     } finally {
@@ -129,6 +194,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         signup,
         logout,
         loading,
+        isOnline
       }}
     >
       {children}

@@ -1,3 +1,4 @@
+<lov-code>
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -35,19 +36,19 @@ import { useAuth } from "@/hooks/useAuth";
 
 // AI Models from Hugging Face
 const AI_MODELS = [
-  { id: "stabilityai/stable-diffusion-xl-base-1.0", name: "Stable Diffusion XL 1.5+", aspectRatios: ["1:1", "16:9", "4:3", "3:2"] },
-  { id: "runwayml/stable-diffusion-v1-5", name: "SD Lightning V2", aspectRatios: ["1:1", "4:3", "3:4"] },
-  { id: "prompthero/openjourney", name: "OpenJourney V4 Pro", aspectRatios: ["1:1", "16:9"] },
-  { id: "dreamshaper/dreamshaper-xl", name: "DreamShaper XL Pro", aspectRatios: ["1:1", "16:9", "9:16"] },
-  { id: "segmind/SSD-1B", name: "SDXL Turbo Pro", aspectRatios: ["1:1", "16:9", "9:16", "4:3"] },
-  { id: "stabilityai/sdxl-turbo", name: "SDXL Turbo", aspectRatios: ["1:1", "16:9", "4:3"] },
-  { id: "dataautogpt3/RealVisXL-V4", name: "RealVisXL V4.0 UHD", aspectRatios: ["1:1", "16:9", "4:3", "3:2"] },
-  { id: "deepfloyd/IF-I-XL-v1.0", name: "DeepFloyd IF Ultra", aspectRatios: ["1:1", "16:9"] },
-  { id: "lllyasviel/sd-controlnet-depth", name: "ControlNet + SDXL", aspectRatios: ["1:1", "16:9", "4:3"] },
-  { id: "playgroundai/playground-v2.5-1024px-aesthetic", name: "Playground V2.5 Ultra", aspectRatios: ["1:1", "4:3", "3:4", "16:9"] },
-  { id: "julibrain/photoreal", name: "JuliBrain Photoreal", aspectRatios: ["1:1", "4:3", "16:9"] },
-  { id: "PixArt-alpha/PixArt-XL-2-1024-MS", name: "PixArt-Σ Ultra", aspectRatios: ["1:1", "16:9", "4:3"] },
-  { id: "ByteDance/FLUX-1-schnell", name: "FLUX.1-schnell MAX", aspectRatios: ["1:1", "16:9", "4:3", "3:2"] },
+  { id: "stabilityai/stable-diffusion-xl-base-1.0", name: "Stable Diffusion XL 1.5+", aspectRatios: ["1:1", "16:9", "9:16", "4:3", "3:4", "3:2", "2:3", "5:4", "4:5", "21:9", "9:21", "2:1", "1:2", "4:1", "1:4", "3:1", "1:3", "16:10", "10:16", "8:5", "5:8"] },
+  { id: "runwayml/stable-diffusion-v1-5", name: "SD Lightning V2", aspectRatios: ["1:1", "4:3", "3:4", "16:9", "9:16", "2:3", "3:2", "21:9", "9:21", "2:1", "1:2", "3:1", "1:3", "5:4", "4:5", "16:10", "10:16", "8:5", "5:8", "7:4", "4:7"] },
+  { id: "prompthero/openjourney", name: "OpenJourney V4 Pro", aspectRatios: ["1:1", "16:9", "9:16", "4:3", "3:4", "3:2", "2:3", "5:4", "4:5", "21:9", "9:21", "2:1", "1:2", "3:1", "1:3", "16:10", "10:16", "8:5", "5:8"] },
+  { id: "dreamshaper/dreamshaper-xl", name: "DreamShaper XL Pro", aspectRatios: ["1:1", "16:9", "9:16", "4:3", "3:4", "3:2", "2:3", "5:4", "4:5", "21:9", "9:21", "2:1", "1:2", "3:1", "1:3", "16:10", "10:16", "8:5", "5:8"] },
+  { id: "segmind/SSD-1B", name: "SDXL Turbo Pro", aspectRatios: ["1:1", "16:9", "9:16", "4:3", "3:4", "3:2", "2:3", "5:4", "4:5", "21:9", "9:21", "2:1", "1:2", "3:1", "1:3", "16:10", "10:16", "8:5", "5:8"] },
+  { id: "stabilityai/sdxl-turbo", name: "SDXL Turbo", aspectRatios: ["1:1", "16:9", "9:16", "4:3", "3:4", "3:2", "2:3", "5:4", "4:5", "21:9", "9:21", "2:1", "1:2", "3:1", "1:3", "16:10", "10:16", "8:5", "5:8"] },
+  { id: "dataautogpt3/RealVisXL-V4", name: "RealVisXL V4.0 UHD", aspectRatios: ["1:1", "16:9", "9:16", "4:3", "3:4", "3:2", "2:3", "5:4", "4:5", "21:9", "9:21", "2:1", "1:2", "3:1", "1:3", "16:10", "10:16", "8:5", "5:8"] },
+  { id: "deepfloyd/IF-I-XL-v1.0", name: "DeepFloyd IF Ultra", aspectRatios: ["1:1", "16:9", "9:16", "4:3", "3:4", "3:2", "2:3", "5:4", "4:5", "21:9", "9:21", "2:1", "1:2", "3:1", "1:3", "16:10", "10:16"] },
+  { id: "lllyasviel/sd-controlnet-depth", name: "ControlNet + SDXL", aspectRatios: ["1:1", "16:9", "9:16", "4:3", "3:4", "3:2", "2:3", "5:4", "4:5", "21:9", "9:21", "2:1", "1:2", "3:1", "1:3", "16:10", "10:16", "8:5", "5:8"] },
+  { id: "playgroundai/playground-v2.5-1024px-aesthetic", name: "Playground V2.5 Ultra", aspectRatios: ["1:1", "4:3", "3:4", "16:9", "9:16", "3:2", "2:3", "5:4", "4:5", "21:9", "9:21", "2:1", "1:2", "3:1", "1:3", "16:10", "10:16", "8:5", "5:8"] },
+  { id: "stabilityai/stable-diffusion-3-medium", name: "Stable Diffusion 3 Medium", aspectRatios: ["1:1", "16:9", "9:16", "4:3", "3:4", "3:2", "2:3", "5:4", "4:5", "21:9", "9:21", "2:1", "1:2", "3:1", "1:3", "16:10", "10:16", "8:5", "5:8"] },
+  { id: "ByteDance/FLUX-1-schnell", name: "FLUX.1-schnell MAX", aspectRatios: ["1:1", "16:9", "9:16", "4:3", "3:4", "3:2", "2:3", "5:4", "4:5", "21:9", "9:21", "2:1", "1:2", "3:1", "1:3", "16:10", "10:16", "8:5", "5:8"] },
+  { id: "PixArt-alpha/PixArt-XL-2-1024-MS", name: "PixArt-Σ Ultra", aspectRatios: ["1:1", "16:9", "9:16", "4:3", "3:4", "3:2", "2:3", "5:4", "4:5", "21:9", "9:21", "2:1", "1:2", "3:1", "1:3", "16:10", "10:16", "8:5", "5:8"] },
 ];
 
 // Art Style Categories and Styles
@@ -135,13 +136,19 @@ const generateImageWithHuggingFace = async (
   model: string, 
   apiKey: string, 
   aspectRatio: string,
-  numberOfImages: number = 1
+  numberOfImages: number = 1,
+  imageQuality: number = 7
 ) => {
   try {
     const [width, height] = getWidthHeightFromAspectRatio(aspectRatio);
     
     // Create an array of promises for multiple image generation
-    const imagePromises = Array(numberOfImages).fill(0).map(async () => {
+    const imagePromises = Array(numberOfImages).fill(0).map(async (_, index) => {
+      // Add a slight delay between requests to avoid rate limiting
+      if (index > 0) {
+        await new Promise(resolve => setTimeout(resolve, 300 * index));
+      }
+      
       const response = await fetch(`https://api-inference.huggingface.co/models/${model}`, {
         method: "POST",
         headers: {
@@ -153,15 +160,24 @@ const generateImageWithHuggingFace = async (
           parameters: {
             width,
             height,
-            num_inference_steps: 30,
-            guidance_scale: 7.5,
+            num_inference_steps: 30 + (imageQuality * 2), // Scale steps with quality
+            guidance_scale: 5.5 + (imageQuality * 0.5), // Scale guidance with quality
+            negative_prompt: "blurry, distorted, low quality, ugly, duplicate, poorly drawn, low resolution",
           }
         }),
       });
 
       if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error || `Failed to generate image with model ${model}`);
+        // Try to get error message from response
+        try {
+          const error = await response.json();
+          if (error.error && error.error.includes("does not exist")) {
+            throw new Error(`Model ${model} does not exist. Please try a different model.`);
+          }
+          throw new Error(error.error || `Failed to generate image with model ${model}`);
+        } catch (e) {
+          throw new Error(`Failed to generate image with model ${model}: ${response.status} ${response.statusText}`);
+        }
       }
 
       const blob = await response.blob();
@@ -180,14 +196,18 @@ const generateImageWithHuggingFace = async (
 const getWidthHeightFromAspectRatio = (aspectRatio: string): [number, number] => {
   const [widthRatio, heightRatio] = aspectRatio.split(':').map(Number);
   
-  // Base size to maintain reasonable dimensions
-  const baseSize = 512;
+  // Base size to maintain reasonable dimensions, max 1024px for any dimension
+  const baseSize = 1024;
   
   // Calculate dimensions while maintaining the aspect ratio
   if (widthRatio > heightRatio) {
-    return [baseSize, Math.round(baseSize * (heightRatio / widthRatio))];
+    const width = baseSize;
+    const height = Math.round(baseSize * (heightRatio / widthRatio));
+    return [width, height];
   } else {
-    return [Math.round(baseSize * (widthRatio / heightRatio)), baseSize];
+    const height = baseSize;
+    const width = Math.round(baseSize * (widthRatio / heightRatio));
+    return [width, height];
   }
 };
 
@@ -288,7 +308,8 @@ const ImageGenerator = () => {
           aiModel, 
           huggingFaceApiKey,
           aspectRatio,
-          numberOfImages
+          numberOfImages,
+          imageQuality
         );
         
         setGeneratedImages(images);
@@ -442,12 +463,26 @@ const ImageGenerator = () => {
                     <SelectTrigger>
                       <SelectValue placeholder="Aspect Ratio" />
                     </SelectTrigger>
-                    <SelectContent>
-                      {availableAspectRatios.map((ratio) => (
-                        <SelectItem key={ratio} value={ratio}>
-                          {ratio} Aspect Ratio
-                        </SelectItem>
-                      ))}
+                    <SelectContent className="max-h-[200px] overflow-y-auto">
+                      <SelectItem value="1:1">1:1 Square</SelectItem>
+                      <SelectItem value="16:9">16:9 Landscape</SelectItem>
+                      <SelectItem value="9:16">9:16 Portrait</SelectItem>
+                      <SelectItem value="4:3">4:3 Standard</SelectItem>
+                      <SelectItem value="3:4">3:4 Portrait</SelectItem>
+                      <SelectItem value="3:2">3:2 Photo</SelectItem>
+                      <SelectItem value="2:3">2:3 Portrait</SelectItem>
+                      <SelectItem value="21:9">21:9 Cinematic</SelectItem>
+                      <SelectItem value="9:21">9:21 Tall</SelectItem>
+                      <SelectItem value="2:1">2:1 Panorama</SelectItem>
+                      <SelectItem value="1:2">1:2 Tall</SelectItem>
+                      <SelectItem value="4:5">4:5 Instagram</SelectItem>
+                      <SelectItem value="5:4">5:4 Desktop</SelectItem>
+                      <SelectItem value="16:10">16:10 Laptop</SelectItem>
+                      <SelectItem value="10:16">10:16 Phone</SelectItem>
+                      <SelectItem value="8:5">8:5 Widescreen</SelectItem>
+                      <SelectItem value="5:8">5:8 Book</SelectItem>
+                      <SelectItem value="3:1">3:1 Banner</SelectItem>
+                      <SelectItem value="1:3">1:3 Skyscraper</SelectItem>
                     </SelectContent>
                   </Select>
                   
@@ -650,28 +685,3 @@ const ImageGenerator = () => {
             </div>
           </div>
         )}
-        
-        {isGenerating && (
-          <div className="relative aspect-square md:aspect-video rounded-lg border bg-muted/10 backdrop-blur-sm border-primary/10 flex items-center justify-center overflow-hidden">
-            <div className="absolute inset-0 bg-background/80 backdrop-blur-sm flex items-center justify-center">
-              <div className="flex flex-col items-center gap-4">
-                <div className="animate-spin">
-                  <Settings2 className="h-8 w-8" />
-                </div>
-                <p className="text-sm">Generating {numberOfImages} image{numberOfImages > 1 ? 's' : ''}...</p>
-              </div>
-            </div>
-          </div>
-        )}
-      </div>
-
-      {generationMethod === "huggingface" && (
-        <div className="text-sm text-muted-foreground text-center">
-          <p>Powered by Hugging Face's AI models. Select from 13 different AI models and 100+ art styles.</p>
-        </div>
-      )}
-    </div>
-  );
-};
-
-export default ImageGenerator;
