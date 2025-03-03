@@ -2,6 +2,7 @@
 import Navbar from "@/components/Navbar";
 import ImageGenerator from "@/components/ImageGenerator";
 import PricingSection from "@/components/PricingSection";
+import Footer from "@/components/Footer";
 
 const Index = () => {
   return (
@@ -22,6 +23,7 @@ const Index = () => {
         </section>
         <PricingSection />
       </main>
+      <Footer />
     </div>
   );
 };
