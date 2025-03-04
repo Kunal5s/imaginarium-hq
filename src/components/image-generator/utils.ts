@@ -1,5 +1,6 @@
 
 import { supabase } from "@/integrations/supabase/client";
+import { AI_MODELS } from "./constants";
 
 // Helper function to convert aspect ratio to width and height
 export const getWidthHeightFromAspectRatio = (aspectRatio: string): [number, number] => {
