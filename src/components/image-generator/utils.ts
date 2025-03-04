@@ -27,7 +27,8 @@ export const generateImageWithHuggingFace = async (
   apiKey: string, 
   aspectRatio: string,
   numberOfImages: number = 1,
-  imageQuality: number = 7
+  imageQuality: number = 7,
+  onProgress?: (progress: number) => void
 ) => {
   try {
     const [width, height] = getWidthHeightFromAspectRatio(aspectRatio);
@@ -39,39 +40,73 @@ export const generateImageWithHuggingFace = async (
         await new Promise(resolve => setTimeout(resolve, 300 * index));
       }
       
-      const response = await fetch(`https://api-inference.huggingface.co/models/${model}`, {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${apiKey}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ 
-          inputs: prompt,
-          parameters: {
-            width,
-            height,
-            num_inference_steps: 30 + (imageQuality * 2), // Scale steps with quality
-            guidance_scale: 5.5 + (imageQuality * 0.5), // Scale guidance with quality
-            negative_prompt: "blurry, distorted, low quality, ugly, duplicate, poorly drawn, low resolution",
-          }
-        }),
-      });
-
-      if (!response.ok) {
-        // Try to get error message from response
-        try {
-          const error = await response.json();
-          if (error.error && error.error.includes("does not exist")) {
-            throw new Error(`Model ${model} does not exist. Please try a different model.`);
-          }
-          throw new Error(error.error || `Failed to generate image with model ${model}`);
-        } catch (e) {
-          throw new Error(`Failed to generate image with model ${model}: ${response.status} ${response.statusText}`);
-        }
+      // Calculate appropriate parameters based on model and quality
+      const inferenceSteps = getInferenceSteps(model, imageQuality);
+      const guidanceScale = getGuidanceScale(model, imageQuality);
+      const negativePrompt = getNegativePrompt(model);
+      
+      // Update progress
+      if (onProgress) {
+        onProgress(Math.round((index / numberOfImages) * 50)); // First 50% is initialization
       }
+      
+      // Set a reasonable timeout for the fetch operation
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 180000); // 3 minutes timeout
+      
+      try {
+        const response = await fetch(`https://api-inference.huggingface.co/models/${model}`, {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${apiKey}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ 
+            inputs: prompt,
+            parameters: {
+              width,
+              height,
+              num_inference_steps: inferenceSteps,
+              guidance_scale: guidanceScale,
+              negative_prompt: negativePrompt,
+              num_images_per_prompt: 1, // Generate one at a time to avoid timeout
+            }
+          }),
+          signal: controller.signal
+        });
+        
+        clearTimeout(timeoutId);
+        
+        // Update progress
+        if (onProgress) {
+          onProgress(Math.round(50 + ((index + 0.5) / numberOfImages) * 50)); // Second 50% is processing
+        }
 
-      const blob = await response.blob();
-      return URL.createObjectURL(blob);
+        if (!response.ok) {
+          // Try to get error message from response
+          try {
+            const error = await response.json();
+            if (error.error && error.error.includes("does not exist")) {
+              throw new Error(`Model ${model} does not exist. Please try a different model.`);
+            }
+            throw new Error(error.error || `Failed to generate image with model ${model}`);
+          } catch (e) {
+            throw new Error(`Failed to generate image with model ${model}: ${response.status} ${response.statusText}`);
+          }
+        }
+
+        const blob = await response.blob();
+        
+        // Update progress complete
+        if (onProgress && index === numberOfImages - 1) {
+          onProgress(100);
+        }
+        
+        return URL.createObjectURL(blob);
+      } catch (error) {
+        clearTimeout(timeoutId);
+        throw error;
+      }
     });
 
     // Return all generated images
@@ -82,12 +117,53 @@ export const generateImageWithHuggingFace = async (
   }
 };
 
+// Model-specific parameter optimization functions
+const getInferenceSteps = (model: string, quality: number): number => {
+  // Base number of steps by model type
+  if (model.includes("sdxl-turbo") || model.includes("SSD-1B") || model.includes("dreamshaper-xl-turbo")) {
+    return 20 + (quality * 1.5); // Faster models need fewer steps
+  } else if (model.includes("stable-diffusion-3") || model.includes("RealVisXL") || model.includes("google/")) {
+    return 35 + (quality * 3); // High-quality models need more steps
+  } else {
+    return 25 + (quality * 2); // Default for other models
+  }
+};
+
+const getGuidanceScale = (model: string, quality: number): number => {
+  // Customize guidance scale by model type
+  if (model.includes("pix2pix") || model.includes("kandinsky")) {
+    return 7.0 + (quality * 0.35); // Models that need higher guidance
+  } else if (model.includes("openjourney") || model.includes("google/")) {
+    return 9.0 + (quality * 0.3); // Midjourney-like needs higher guidance
+  } else {
+    return 5.5 + (quality * 0.5); // Default for other models
+  }
+};
+
+const getNegativePrompt = (model: string): string => {
+  // Base negative prompt for all models
+  const baseNegative = "blurry, distorted, low quality, ugly, duplicate, poorly drawn, low resolution, watermark";
+  
+  // Add model-specific negatives
+  if (model.includes("anime") || model.includes("Animagine")) {
+    return `${baseNegative}, bad anatomy, bad hands, text, error, missing fingers, extra digit, fewer digits, cropped, worst quality, low quality, normal quality, jpeg artifacts, signature, watermark, username, artist name`;
+  } else if (model.includes("RealVisXL") || model.includes("photorealistic")) {
+    return `${baseNegative}, deformed, unrealistic, grainy, noisy, unnatural colors, unnatural lighting, overexposed, underexposed`;
+  } else {
+    return baseNegative;
+  }
+};
+
 // Function to generate images using OpenAI API via Supabase function
 export const generateImageWithOpenAI = async (
   prompt: string,
   size: string,
-  numberOfImages: number = 1
+  numberOfImages: number = 1,
+  onProgress?: (progress: number) => void
 ) => {
+  // Start progress at 10%
+  if (onProgress) onProgress(10);
+  
   const { data, error: supabaseError } = await supabase.functions.invoke('generate-image', {
     body: { 
       prompt: prompt.trim(),
@@ -95,6 +171,9 @@ export const generateImageWithOpenAI = async (
       n: numberOfImages
     }
   });
+
+  // Update progress to 90%
+  if (onProgress) onProgress(90);
 
   if (supabaseError) throw supabaseError;
   
@@ -105,6 +184,9 @@ export const generateImageWithOpenAI = async (
       throw new Error(data.error);
     }
   }
+  
+  // Complete progress
+  if (onProgress) onProgress(100);
   
   return [data.imageUrl];
 };
@@ -123,4 +205,12 @@ export const saveImageToGallery = (selectedImage: string) => {
   }
   
   return false;
+};
+
+// Get estimated time based on model
+export const getEstimatedTime = (model: string, numberOfImages: number): number => {
+  const modelConfig = AI_MODELS.find(m => m.id === model);
+  if (!modelConfig) return 30 * numberOfImages; // Default estimate
+  
+  return modelConfig.timeEstimate * numberOfImages;
 };

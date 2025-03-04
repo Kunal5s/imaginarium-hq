@@ -4,7 +4,9 @@ import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
 import GeneratorForm from "./image-generator/GeneratorForm";
 import ImagePreview from "./image-generator/ImagePreview";
-import { generateImageWithHuggingFace, generateImageWithOpenAI } from "./image-generator/utils";
+import { generateImageWithHuggingFace, generateImageWithOpenAI, getEstimatedTime } from "./image-generator/utils";
+import { Progress } from "@/components/ui/progress";
+import { AI_MODELS } from "./image-generator/constants";
 
 const ImageGenerator = () => {
   const [prompt, setPrompt] = useState("");
@@ -19,6 +21,8 @@ const ImageGenerator = () => {
   const [aspectRatio, setAspectRatio] = useState("1:1");
   const [numberOfImages, setNumberOfImages] = useState(1);
   const [imageQuality, setImageQuality] = useState(7);
+  const [generationProgress, setGenerationProgress] = useState(0);
+  const [estimatedTime, setEstimatedTime] = useState(0);
   const { toast } = useToast();
   const { isAuthenticated } = useAuth();
   
@@ -47,12 +51,30 @@ const ImageGenerator = () => {
 
     setIsGenerating(true);
     setError(null);
+    setGenerationProgress(0);
+    
+    // Calculate and display estimated time
+    const timeEstimate = getEstimatedTime(aiModel, numberOfImages);
+    setEstimatedTime(timeEstimate);
+    
+    // Show toast for long-running generations
+    if (timeEstimate > 50) {
+      toast({
+        title: "High-Quality Generation",
+        description: `This model may take ${timeEstimate} seconds or more to generate ${numberOfImages} image${numberOfImages > 1 ? 's' : ''}. Please be patient.`,
+      });
+    }
     
     try {
       let images: string[] = [];
       
       if (generationMethod === "openai") {
-        images = await generateImageWithOpenAI(prompt.trim(), imageSize, numberOfImages);
+        images = await generateImageWithOpenAI(
+          prompt.trim(), 
+          imageSize, 
+          numberOfImages,
+          setGenerationProgress
+        );
       } else {
         // Hugging Face API generation
         let enhancedPrompt = prompt.trim();
@@ -66,7 +88,8 @@ const ImageGenerator = () => {
           huggingFaceApiKey,
           aspectRatio,
           numberOfImages,
-          imageQuality
+          imageQuality,
+          setGenerationProgress
         );
       }
       
@@ -89,6 +112,8 @@ const ImageGenerator = () => {
       });
     } finally {
       setIsGenerating(false);
+      setGenerationProgress(0);
+      setEstimatedTime(0);
     }
   };
 
@@ -125,6 +150,22 @@ const ImageGenerator = () => {
         error={error}
         onGenerate={handleGenerate}
       />
+
+      {isGenerating && (
+        <div className="space-y-2">
+          <div className="flex justify-between text-sm text-muted-foreground">
+            <span>Generating images...</span>
+            <span>{generationProgress}%</span>
+          </div>
+          <Progress value={generationProgress} className="h-2" />
+          {estimatedTime > 0 && (
+            <p className="text-xs text-muted-foreground text-center">
+              Estimated time: {estimatedTime} seconds. 
+              {estimatedTime > 50 && " High-quality models take longer but produce better results."}
+            </p>
+          )}
+        </div>
+      )}
 
       <ImagePreview 
         generatedImages={generatedImages}

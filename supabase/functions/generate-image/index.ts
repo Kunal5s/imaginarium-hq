@@ -13,7 +13,7 @@ serve(async (req) => {
   }
 
   try {
-    const { prompt, size = "1024x1024" } = await req.json()
+    const { prompt, size = "1024x1024", n = 1 } = await req.json()
     const openAIApiKey = Deno.env.get('OPENAI_API_KEY')
 
     if (!openAIApiKey) {
@@ -24,11 +24,12 @@ serve(async (req) => {
     console.log('Making request to OpenAI API with prompt:', prompt)
 
     const requestBody = {
-      model: "dall-e-2",
+      model: "dall-e-3", // Upgrade to latest model for higher quality
       prompt,
-      n: 1,
+      n: n > 1 ? 1 : n, // DALL-E 3 only supports 1 image at a time
       size,
       response_format: 'url',
+      quality: "hd", // Request HD quality
     }
     
     console.log('Request body:', JSON.stringify(requestBody))
