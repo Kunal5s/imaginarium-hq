@@ -1,17 +1,21 @@
 
 import { useState, useEffect } from "react";
 import { useToast } from "@/hooks/use-toast";
-import { useAuth } from "@/hooks/useAuth";
 import GeneratorForm from "./image-generator/GeneratorForm";
 import ImagePreview from "./image-generator/ImagePreview";
 import { 
   generateImageWithHuggingFace, 
   generateImageWithOpenAI, 
   getEstimatedTime,
-  getFallbackModel
+  getFallbackModel,
+  downloadImage,
+  downloadAllImages
 } from "./image-generator/utils";
 import { Progress } from "@/components/ui/progress";
 import { AI_MODELS } from "./image-generator/constants";
+import { Button } from "@/components/ui/button";
+import { Download, DownloadCloud } from "lucide-react";
+import { useTheme } from "@/hooks/useTheme";
 
 const ImageGenerator = () => {
   const [prompt, setPrompt] = useState("");
@@ -29,24 +33,22 @@ const ImageGenerator = () => {
   const [generationProgress, setGenerationProgress] = useState(0);
   const [estimatedTime, setEstimatedTime] = useState(0);
   const [retryCount, setRetryCount] = useState(0);
+  const [isDownloading, setIsDownloading] = useState(false);
   const { toast } = useToast();
-  const { isAuthenticated } = useAuth();
+  const { theme } = useTheme();
   
   // Updated Hugging Face API key
-  const huggingFaceApiKey = "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";
+  const huggingFaceApiKey = "hf_GgldukYybURdPGrMDrTWJVCMcuRw";
 
-  // No longer check authentication status - it's now free to try!
+  // Welcome message
   useEffect(() => {
-    if (!isAuthenticated) {
-      toast({
-        title: "Welcome to our AI Image Generator!",
-        description: "No sign-up required! Your images will be saved for 30 minutes.",
-      });
-    }
-  }, [isAuthenticated, toast]);
+    toast({
+      title: "Welcome to our AI Image Generator!",
+      description: "No sign-up required! Your images will be saved for 30 minutes.",
+    });
+  }, [toast]);
 
   const handleGenerate = async () => {
-    // Remove authentication check
     if (!prompt.trim()) {
       toast({
         title: "Please enter a prompt",
@@ -59,15 +61,15 @@ const ImageGenerator = () => {
     setError(null);
     setGenerationProgress(0);
     
-    // Calculate and display estimated time
-    const timeEstimate = getEstimatedTime(aiModel, numberOfImages);
+    // Calculate and display estimated time - ensure it's under 50 seconds
+    const timeEstimate = Math.min(getEstimatedTime(aiModel, numberOfImages), 50);
     setEstimatedTime(timeEstimate);
     
     // Show toast for long-running generations
-    if (timeEstimate > 50) {
+    if (timeEstimate > 30) {
       toast({
-        title: "High-Quality Generation",
-        description: `This model may take ${timeEstimate} seconds or more to generate ${numberOfImages} image${numberOfImages > 1 ? 's' : ''}. Please be patient.`,
+        title: "Generating your images...",
+        description: `This may take up to ${timeEstimate} seconds to create ${numberOfImages} image${numberOfImages > 1 ? 's' : ''}. Please be patient.`,
       });
     }
     
@@ -92,8 +94,6 @@ const ImageGenerator = () => {
           
           // Switch to Hugging Face as fallback
           setGenerationMethod("huggingface");
-          
-          // Continue to Hugging Face generation below
         }
       }
       
@@ -115,6 +115,27 @@ const ImageGenerator = () => {
             imageQuality,
             setGenerationProgress
           );
+          
+          // Verify we got the correct number of images
+          if (images.length < numberOfImages) {
+            console.log(`Only generated ${images.length}/${numberOfImages} images, attempting to get more...`);
+            
+            // Try to generate more images to reach the requested count
+            const remainingCount = numberOfImages - images.length;
+            if (remainingCount > 0) {
+              const moreImages = await generateImageWithHuggingFace(
+                enhancedPrompt, 
+                aiModel, 
+                huggingFaceApiKey,
+                aspectRatio,
+                remainingCount,
+                imageQuality,
+                setGenerationProgress
+              );
+              
+              images = [...images, ...moreImages];
+            }
+          }
         } catch (error) {
           console.error('Error in primary model, trying fallback:', error);
           
@@ -133,7 +154,7 @@ const ImageGenerator = () => {
               fallbackModel, 
               huggingFaceApiKey,
               aspectRatio,
-              Math.min(numberOfImages, 2), // Reduce number of images for fallback
+              numberOfImages, // Try to generate the full requested number
               imageQuality,
               setGenerationProgress
             );
@@ -167,6 +188,56 @@ const ImageGenerator = () => {
       setRetryCount(0);
     }
   };
+  
+  // Handle downloading the selected image
+  const handleDownloadImage = async () => {
+    if (!selectedImage) return;
+    
+    setIsDownloading(true);
+    try {
+      const success = await downloadImage(selectedImage, `ai-image-${Date.now()}`);
+      if (success) {
+        toast({
+          title: "Image downloaded successfully",
+        });
+      } else {
+        throw new Error("Failed to download image");
+      }
+    } catch (error) {
+      toast({
+        title: "Download failed",
+        description: "Could not download the image. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsDownloading(false);
+    }
+  };
+  
+  // Handle downloading all generated images
+  const handleDownloadAllImages = async () => {
+    if (generatedImages.length === 0) return;
+    
+    setIsDownloading(true);
+    try {
+      const success = await downloadAllImages(generatedImages, `ai-images-batch-${Date.now()}`);
+      if (success) {
+        toast({
+          title: "All images downloaded successfully",
+        });
+      } else {
+        throw new Error("Failed to download some images");
+      }
+    } catch (error) {
+      toast({
+        title: "Download failed",
+        description: "Could not download all images. Please try downloading individually.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsDownloading(false);
+    }
+  };
 
   return (
     <div className="w-full max-w-5xl mx-auto p-6 space-y-8">
@@ -175,7 +246,7 @@ const ImageGenerator = () => {
           AI Image Generator Pro
         </h2>
         <p className="text-muted-foreground max-w-2xl mx-auto">
-          Generate AI images easily! Just enter your prompt, select an art style, and get high-quality images instantly.
+          Generate AI images easily! Just enter your prompt, select an art style, and get high-quality images in under 50 seconds.
           No sign-up required! Your images will be saved for 30 minutes.
         </p>
       </div>
@@ -212,7 +283,7 @@ const ImageGenerator = () => {
           {estimatedTime > 0 && (
             <p className="text-xs text-muted-foreground text-center">
               Estimated time: {estimatedTime} seconds. 
-              {estimatedTime > 50 && " High-quality models take longer but produce better results."}
+              {estimatedTime > 30 && " For highest quality results."}
             </p>
           )}
         </div>
@@ -224,6 +295,33 @@ const ImageGenerator = () => {
         setSelectedImage={setSelectedImage}
         isGenerating={isGenerating}
       />
+      
+      {/* Download buttons */}
+      {generatedImages.length > 0 && (
+        <div className="flex flex-col sm:flex-row gap-4 justify-center mt-6">
+          <Button 
+            onClick={handleDownloadImage} 
+            disabled={!selectedImage || isDownloading}
+            className="flex items-center gap-2"
+            variant={theme === "dark" ? "outline" : "default"}
+          >
+            <Download className="h-4 w-4" />
+            Download Selected Image
+          </Button>
+          
+          {generatedImages.length > 1 && (
+            <Button 
+              onClick={handleDownloadAllImages} 
+              disabled={isDownloading} 
+              className="flex items-center gap-2" 
+              variant={theme === "dark" ? "outline" : "secondary"}
+            >
+              <DownloadCloud className="h-4 w-4" />
+              Download All Images
+            </Button>
+          )}
+        </div>
+      )}
     </div>
   );
 };

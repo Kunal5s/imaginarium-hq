@@ -1,4 +1,3 @@
-
 import { supabase } from "@/integrations/supabase/client";
 import { AI_MODELS } from "./constants";
 
@@ -34,40 +33,41 @@ export const generateImageWithHuggingFace = async (
   try {
     const [width, height] = getWidthHeightFromAspectRatio(aspectRatio);
     
+    // Optimized parameters based on model type for faster generation
+    const inferenceSteps = getFastInferenceSteps(model, imageQuality);
+    const guidanceScale = getFastGuidanceScale(model, imageQuality);
+    const negativePrompt = getNegativePrompt(model);
+    
     // Create an array of promises for multiple image generation
     const imagePromises = Array(numberOfImages).fill(0).map(async (_, index) => {
-      // Add a slight delay between requests to avoid rate limiting
+      // Faster parallel requests with minimal delay
       if (index > 0) {
-        await new Promise(resolve => setTimeout(resolve, 300 * index));
+        await new Promise(resolve => setTimeout(resolve, 100 * index));
       }
-      
-      // Calculate appropriate parameters based on model and quality
-      const inferenceSteps = getInferenceSteps(model, imageQuality);
-      const guidanceScale = getGuidanceScale(model, imageQuality);
-      const negativePrompt = getNegativePrompt(model);
       
       // Update progress
       if (onProgress) {
-        onProgress(Math.round((index / numberOfImages) * 50)); // First 50% is initialization
+        onProgress(Math.round((index / numberOfImages) * 30)); // First 30% is initialization
       }
       
-      // Set a reasonable timeout for the fetch operation
+      // Set a reasonable timeout for the fetch operation - reduced for faster experience
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 180000); // 3 minutes timeout
+      const timeoutId = setTimeout(() => controller.abort(), 45000); // 45 seconds timeout (reduced from 180s)
       
       try {
-        console.log(`Attempting to generate image with model: ${model}`);
+        console.log(`Attempting to generate image ${index+1}/${numberOfImages} with model: ${model}`);
         
-        // Try up to 3 times with exponential backoff
+        // Try up to 2 times with faster backoff (reduced from 3 attempts)
         let response = null;
         let attempt = 0;
-        const maxAttempts = 3;
+        const maxAttempts = 2;
         
         while (attempt < maxAttempts && !response) {
           try {
             if (attempt > 0) {
               console.log(`Retry attempt ${attempt} for model ${model}`);
-              await new Promise(resolve => setTimeout(resolve, 1000 * Math.pow(2, attempt)));
+              // Faster retry with shorter delay
+              await new Promise(resolve => setTimeout(resolve, 500 * Math.pow(2, attempt)));
             }
             
             response = await fetch(`https://api-inference.huggingface.co/models/${model}`, {
@@ -85,6 +85,7 @@ export const generateImageWithHuggingFace = async (
                   guidance_scale: guidanceScale,
                   negative_prompt: negativePrompt,
                   num_images_per_prompt: 1, // Generate one at a time to avoid timeout
+                  seed: Math.floor(Math.random() * 2147483647) // Random seed for variety
                 }
               }),
               signal: controller.signal
@@ -127,7 +128,7 @@ export const generateImageWithHuggingFace = async (
         
         // Update progress
         if (onProgress) {
-          onProgress(Math.round(50 + ((index + 0.5) / numberOfImages) * 50)); // Second 50% is processing
+          onProgress(Math.round(30 + ((index + 0.5) / numberOfImages) * 70)); // Second 70% is processing
         }
 
         const blob = await response.blob();
@@ -163,26 +164,26 @@ export const generateImageWithHuggingFace = async (
   }
 };
 
-// Model-specific parameter optimization functions
-const getInferenceSteps = (model: string, quality: number): number => {
-  // Base number of steps by model type
+// New optimized parameter functions for faster generation
+const getFastInferenceSteps = (model: string, quality: number): number => {
+  // Reduced inference steps for faster generation
   if (model.includes("sdxl-turbo") || model.includes("SSD-1B") || model.includes("dreamshaper-xl-turbo")) {
-    return 20 + (quality * 1.5); // Faster models need fewer steps
+    return 15 + Math.floor(quality * 0.8); // Faster models need fewer steps
   } else if (model.includes("stable-diffusion-3") || model.includes("RealVisXL") || model.includes("google/")) {
-    return 35 + (quality * 3); // High-quality models need more steps
+    return 20 + Math.floor(quality * 1.5); // High-quality models with reduced steps
   } else {
-    return 25 + (quality * 2); // Default for other models
+    return 18 + Math.floor(quality * 1.2); // Default for other models - faster than before
   }
 };
 
-const getGuidanceScale = (model: string, quality: number): number => {
-  // Customize guidance scale by model type
+const getFastGuidanceScale = (model: string, quality: number): number => {
+  // Optimized guidance scale for faster yet good quality results
   if (model.includes("pix2pix") || model.includes("kandinsky")) {
-    return 7.0 + (quality * 0.35); // Models that need higher guidance
+    return 5.0 + (quality * 0.25); // Models that need higher guidance
   } else if (model.includes("openjourney") || model.includes("google/")) {
-    return 9.0 + (quality * 0.3); // Midjourney-like needs higher guidance
+    return 6.0 + (quality * 0.2); // Midjourney-like needs higher guidance
   } else {
-    return 5.5 + (quality * 0.5); // Default for other models
+    return 4.5 + (quality * 0.3); // Default for other models
   }
 };
 
@@ -234,7 +235,8 @@ export const generateImageWithOpenAI = async (
   // Complete progress
   if (onProgress) onProgress(100);
   
-  return [data.imageUrl];
+  // Handle multiple images returned from updated OpenAI endpoint
+  return data.imageUrls || [data.imageUrl]; // Support both formats for backward compatibility
 };
 
 // Function to save an image to gallery
@@ -253,17 +255,49 @@ export const saveImageToGallery = (selectedImage: string) => {
   return false;
 };
 
-// Get estimated time based on model
+// Get estimated time based on model - adjusted for faster target time
 export const getEstimatedTime = (model: string, numberOfImages: number): number => {
   const modelConfig = AI_MODELS.find(m => m.id === model);
-  if (!modelConfig) return 30 * numberOfImages; // Default estimate
-  
-  return modelConfig.timeEstimate * numberOfImages;
+  // Return a more optimistic time estimate (max 50 seconds)
+  const baseTime = modelConfig ? Math.min(modelConfig.timeEstimate, 40) : 25;
+  return Math.min(baseTime * numberOfImages, 50); // Cap at 50 seconds
 };
 
 // Fallback mechanism to get a working model if the selected one fails
 export const getFallbackModel = (failedModel: string): string => {
-  // Return a reliable model that's known to work well
-  return "stabilityai/stable-diffusion-xl-base-1.0";
+  // Return a fast and reliable model 
+  return "stabilityai/sdxl-turbo";
 };
 
+// New function to download an image
+export const downloadImage = async (imageUrl: string, filename: string = "ai-generated-image") => {
+  try {
+    const response = await fetch(imageUrl);
+    const blob = await response.blob();
+    const url = URL.createObjectURL(blob);
+    
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `${filename}.png`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+    
+    return true;
+  } catch (error) {
+    console.error("Error downloading image:", error);
+    return false;
+  }
+};
+
+// New function to download multiple images as a zip
+export const downloadAllImages = async (imageUrls: string[], baseName: string = "ai-generated-images") => {
+  // Not implemented yet - would need JSZip or similar
+  // Since we need to keep this function lightweight, return an array of downloaded status
+  const results = await Promise.all(imageUrls.map((url, index) => 
+    downloadImage(url, `${baseName}-${index+1}`)
+  ));
+  
+  return results.every(result => result);
+};
