@@ -4,7 +4,12 @@ import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
 import GeneratorForm from "./image-generator/GeneratorForm";
 import ImagePreview from "./image-generator/ImagePreview";
-import { generateImageWithHuggingFace, generateImageWithOpenAI, getEstimatedTime } from "./image-generator/utils";
+import { 
+  generateImageWithHuggingFace, 
+  generateImageWithOpenAI, 
+  getEstimatedTime,
+  getFallbackModel
+} from "./image-generator/utils";
 import { Progress } from "@/components/ui/progress";
 import { AI_MODELS } from "./image-generator/constants";
 
@@ -23,6 +28,7 @@ const ImageGenerator = () => {
   const [imageQuality, setImageQuality] = useState(7);
   const [generationProgress, setGenerationProgress] = useState(0);
   const [estimatedTime, setEstimatedTime] = useState(0);
+  const [retryCount, setRetryCount] = useState(0);
   const { toast } = useToast();
   const { isAuthenticated } = useAuth();
   
@@ -69,28 +75,72 @@ const ImageGenerator = () => {
       let images: string[] = [];
       
       if (generationMethod === "openai") {
-        images = await generateImageWithOpenAI(
-          prompt.trim(), 
-          imageSize, 
-          numberOfImages,
-          setGenerationProgress
-        );
-      } else {
+        try {
+          images = await generateImageWithOpenAI(
+            prompt.trim(), 
+            imageSize, 
+            numberOfImages,
+            setGenerationProgress
+          );
+        } catch (err) {
+          console.error("OpenAI generation failed:", err);
+          toast({
+            title: "OpenAI generation failed",
+            description: "Falling back to Hugging Face models.",
+            variant: "destructive",
+          });
+          
+          // Switch to Hugging Face as fallback
+          setGenerationMethod("huggingface");
+          
+          // Continue to Hugging Face generation below
+        }
+      }
+      
+      // If OpenAI failed or if Hugging Face was selected initially
+      if (generationMethod === "huggingface" || images.length === 0) {
         // Hugging Face API generation
         let enhancedPrompt = prompt.trim();
         if (artStyle) {
           enhancedPrompt = `${enhancedPrompt}, in the style of ${artStyle}, high quality, detailed, 8k resolution`;
         }
 
-        images = await generateImageWithHuggingFace(
-          enhancedPrompt, 
-          aiModel, 
-          huggingFaceApiKey,
-          aspectRatio,
-          numberOfImages,
-          imageQuality,
-          setGenerationProgress
-        );
+        try {
+          images = await generateImageWithHuggingFace(
+            enhancedPrompt, 
+            aiModel, 
+            huggingFaceApiKey,
+            aspectRatio,
+            numberOfImages,
+            imageQuality,
+            setGenerationProgress
+          );
+        } catch (error) {
+          console.error('Error in primary model, trying fallback:', error);
+          
+          // If first attempt failed, try with a fallback model
+          if (retryCount === 0) {
+            setRetryCount(1);
+            const fallbackModel = getFallbackModel(aiModel);
+            
+            toast({
+              title: "Trying alternative model",
+              description: "The selected model is currently unavailable. Trying a more reliable model.",
+            });
+            
+            images = await generateImageWithHuggingFace(
+              enhancedPrompt, 
+              fallbackModel, 
+              huggingFaceApiKey,
+              aspectRatio,
+              Math.min(numberOfImages, 2), // Reduce number of images for fallback
+              imageQuality,
+              setGenerationProgress
+            );
+          } else {
+            throw error; // If fallback also failed, throw the error
+          }
+        }
       }
       
       setGeneratedImages(images);
@@ -100,20 +150,21 @@ const ImageGenerator = () => {
 
       toast({
         title: "Success!",
-        description: `${numberOfImages} image${numberOfImages > 1 ? 's' : ''} generated successfully. Available for 30 minutes.`,
+        description: `${images.length} image${images.length > 1 ? 's' : ''} generated successfully. Available for 30 minutes.`,
       });
     } catch (error) {
       console.error('Error generating image:', error);
       setError(error.message || "Failed to generate image");
       toast({
         title: "Error",
-        description: `Failed to generate image: ${error.message}`,
+        description: `Failed to generate images. Please try a different model or prompt.`,
         variant: "destructive",
       });
     } finally {
       setIsGenerating(false);
       setGenerationProgress(0);
       setEstimatedTime(0);
+      setRetryCount(0);
     }
   };
 

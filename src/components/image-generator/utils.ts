@@ -56,44 +56,78 @@ export const generateImageWithHuggingFace = async (
       const timeoutId = setTimeout(() => controller.abort(), 180000); // 3 minutes timeout
       
       try {
-        const response = await fetch(`https://api-inference.huggingface.co/models/${model}`, {
-          method: "POST",
-          headers: {
-            Authorization: `Bearer ${apiKey}`,
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({ 
-            inputs: prompt,
-            parameters: {
-              width,
-              height,
-              num_inference_steps: inferenceSteps,
-              guidance_scale: guidanceScale,
-              negative_prompt: negativePrompt,
-              num_images_per_prompt: 1, // Generate one at a time to avoid timeout
+        console.log(`Attempting to generate image with model: ${model}`);
+        
+        // Try up to 3 times with exponential backoff
+        let response = null;
+        let attempt = 0;
+        const maxAttempts = 3;
+        
+        while (attempt < maxAttempts && !response) {
+          try {
+            if (attempt > 0) {
+              console.log(`Retry attempt ${attempt} for model ${model}`);
+              await new Promise(resolve => setTimeout(resolve, 1000 * Math.pow(2, attempt)));
             }
-          }),
-          signal: controller.signal
-        });
+            
+            response = await fetch(`https://api-inference.huggingface.co/models/${model}`, {
+              method: "POST",
+              headers: {
+                Authorization: `Bearer ${apiKey}`,
+                "Content-Type": "application/json",
+              },
+              body: JSON.stringify({ 
+                inputs: prompt,
+                parameters: {
+                  width,
+                  height,
+                  num_inference_steps: inferenceSteps,
+                  guidance_scale: guidanceScale,
+                  negative_prompt: negativePrompt,
+                  num_images_per_prompt: 1, // Generate one at a time to avoid timeout
+                }
+              }),
+              signal: controller.signal
+            });
+            
+            // Check if the response is ok, otherwise try again
+            if (!response.ok) {
+              const errorData = await response.json().catch(() => null);
+              console.log(`Error from model ${model}:`, errorData);
+              
+              // If model doesn't exist, exit retry loop immediately
+              if (
+                errorData?.error?.includes("does not exist") || 
+                errorData?.error?.includes("Model not found")
+              ) {
+                throw new Error(`Model ${model} does not exist. Please try a different model.`);
+              }
+              
+              // For busy models or rate limiting, retry
+              if (response.status === 429 || response.status === 503 || response.status === 500) {
+                response = null; // Reset response to trigger next retry
+                attempt++;
+                continue;
+              }
+              
+              throw new Error(errorData?.error || `Failed with status ${response.status}`);
+            }
+          } catch (e) {
+            if (attempt === maxAttempts - 1) throw e;
+            response = null;
+            attempt++;
+          }
+        }
+        
+        if (!response || !response.ok) {
+          throw new Error(`Failed to generate image with model ${model} after multiple attempts`);
+        }
         
         clearTimeout(timeoutId);
         
         // Update progress
         if (onProgress) {
           onProgress(Math.round(50 + ((index + 0.5) / numberOfImages) * 50)); // Second 50% is processing
-        }
-
-        if (!response.ok) {
-          // Try to get error message from response
-          try {
-            const error = await response.json();
-            if (error.error && error.error.includes("does not exist")) {
-              throw new Error(`Model ${model} does not exist. Please try a different model.`);
-            }
-            throw new Error(error.error || `Failed to generate image with model ${model}`);
-          } catch (e) {
-            throw new Error(`Failed to generate image with model ${model}: ${response.status} ${response.statusText}`);
-          }
         }
 
         const blob = await response.blob();
@@ -110,8 +144,19 @@ export const generateImageWithHuggingFace = async (
       }
     });
 
-    // Return all generated images
-    return await Promise.all(imagePromises);
+    // Try to get as many successful images as possible
+    const results = await Promise.allSettled(imagePromises);
+    const successfulImages = results
+      .filter((result): result is PromiseFulfilledResult<string> => result.status === 'fulfilled')
+      .map(result => result.value);
+    
+    if (successfulImages.length === 0) {
+      // If all attempts failed, throw the first error
+      const firstError = results.find(result => result.status === 'rejected') as PromiseRejectedResult;
+      throw firstError.reason || new Error(`Failed to generate any images with model ${model}`);
+    }
+    
+    return successfulImages;
   } catch (error) {
     console.error("Error generating images:", error);
     throw error;
@@ -215,3 +260,10 @@ export const getEstimatedTime = (model: string, numberOfImages: number): number 
   
   return modelConfig.timeEstimate * numberOfImages;
 };
+
+// Fallback mechanism to get a working model if the selected one fails
+export const getFallbackModel = (failedModel: string): string => {
+  // Return a reliable model that's known to work well
+  return "stabilityai/stable-diffusion-xl-base-1.0";
+};
+
