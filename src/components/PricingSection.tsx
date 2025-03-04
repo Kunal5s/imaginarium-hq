@@ -7,29 +7,39 @@ const PricingSection = () => {
     {
       name: "Free",
       price: "$0",
-      features: ["25 images/month", "Standard quality", "24h support"],
+      features: [
+        "No signup required",
+        "Images saved for 30 minutes",
+        "Access to basic models",
+        "Standard quality", 
+        "Basic support"
+      ],
       popular: false,
     },
     {
       name: "Premium",
-      price: "$29",
+      price: "$30",
+      period: "one-time payment",
       features: [
-        "50 images/month",
-        "High quality",
+        "Unlimited image generation",
+        "Permanent image storage",
+        "Access to all models",
+        "High quality resolution",
         "Priority support",
-        "Custom sizes",
+        "Secure Cashfree payment"
       ],
       popular: true,
     },
     {
-      name: "Pro",
-      price: "$99",
+      name: "Enterprise",
+      price: "Custom",
       features: [
-        "Unlimited images",
-        "Maximum quality",
-        "24/7 priority support",
-        "API access",
-        "Custom solutions",
+        "Custom API integration",
+        "Dedicated instance",
+        "Commercial usage rights",
+        "SLA guarantees",
+        "24/7 premium support",
+        "Custom branding options"
       ],
       popular: false,
     },
@@ -43,7 +53,7 @@ const PricingSection = () => {
             Simple, transparent pricing
           </h2>
           <p className="mt-6 text-lg leading-8 text-muted-foreground">
-            Choose the perfect plan for your creative needs
+            Create amazing AI-generated images with our top-quality Hugging Face models
           </p>
         </div>
         <div className="mx-auto mt-16 grid max-w-lg grid-cols-1 gap-6 sm:mt-20 lg:mx-0 lg:max-w-none lg:grid-cols-3">
@@ -67,9 +77,11 @@ const PricingSection = () => {
                   <span className="text-4xl font-bold tracking-tight">
                     {plan.price}
                   </span>
-                  <span className="text-sm font-semibold leading-6 text-muted-foreground">
-                    /month
-                  </span>
+                  {plan.period && (
+                    <span className="text-sm font-semibold leading-6 text-muted-foreground ml-2">
+                      {plan.period}
+                    </span>
+                  )}
                 </p>
               </div>
               <ul className="flex-1 space-y-4">
@@ -84,7 +96,7 @@ const PricingSection = () => {
                 variant={plan.popular ? "default" : "outline"}
                 className="mt-8"
               >
-                Get Started
+                {plan.name === "Free" ? "Start Creating" : "Get Started"}
               </Button>
             </div>
           ))}

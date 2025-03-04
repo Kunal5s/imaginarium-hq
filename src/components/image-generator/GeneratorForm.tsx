@@ -76,23 +76,6 @@ const GeneratorForm: React.FC<GeneratorFormProps> = ({
 
   return (
     <div className="w-full space-y-4">
-      {!isAuthenticated && (
-        <Alert variant="destructive" className="my-4">
-          <AlertTriangle className="h-4 w-4" />
-          <AlertTitle>Authentication Required</AlertTitle>
-          <AlertDescription>
-            You need to sign in before using the image generator.
-            <Button 
-              variant="outline" 
-              onClick={() => navigate('/login')} 
-              className="ml-2"
-            >
-              Sign In
-            </Button>
-          </AlertDescription>
-        </Alert>
-      )}
-
       {error && (
         <Alert variant="destructive" className="my-4">
           <AlertTriangle className="h-4 w-4" />
@@ -118,7 +101,7 @@ const GeneratorForm: React.FC<GeneratorFormProps> = ({
                   <SelectValue placeholder="Select generation method" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="huggingface">Hugging Face (Recommended)</SelectItem>
+                  <SelectItem value="huggingface">Hugging Face (Top-Quality Models)</SelectItem>
                   <SelectItem value="openai">OpenAI DALL-E</SelectItem>
                 </SelectContent>
               </Select>
@@ -222,7 +205,7 @@ const GeneratorForm: React.FC<GeneratorFormProps> = ({
 
             <Button
               onClick={onGenerate}
-              disabled={isGenerating || !isAuthenticated}
+              disabled={isGenerating}
               className="w-full md:w-auto relative overflow-hidden group bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700"
             >
               <span className="flex items-center gap-2">
@@ -261,6 +244,21 @@ const GeneratorForm: React.FC<GeneratorFormProps> = ({
                     <li>Combine with art styles for unique results</li>
                     <li>Try different AI models for varying outputs</li>
                   </ul>
+                </div>
+                
+                <div className="bg-primary/10 p-4 rounded-lg mt-4">
+                  <h3 className="text-lg font-medium mb-2">Upgrade to Premium</h3>
+                  <p className="text-sm text-muted-foreground mb-2">
+                    For just $30, unlock exclusive features with secure Cashfree payment:
+                  </p>
+                  <ul className="list-disc list-inside space-y-1 text-sm text-muted-foreground">
+                    <li>Unlimited image generation</li>
+                    <li>Save images permanently</li>
+                    <li>Access to exclusive premium models</li>
+                    <li>Higher resolution outputs</li>
+                    <li>Priority processing</li>
+                  </ul>
+                  <Button className="mt-3 w-full">Upgrade Now</Button>
                 </div>
               </div>
             </CardContent>

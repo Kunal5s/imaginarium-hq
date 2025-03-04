@@ -22,30 +22,21 @@ const ImageGenerator = () => {
   const { toast } = useToast();
   const { isAuthenticated } = useAuth();
   
-  // Hugging Face API key
-  const huggingFaceApiKey = "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";
+  // Updated Hugging Face API key
+  const huggingFaceApiKey = "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";
 
-  // Check authentication status
+  // No longer check authentication status - it's now free to try!
   useEffect(() => {
     if (!isAuthenticated) {
       toast({
-        title: "Authentication Required",
-        description: "Please sign in to use the image generator",
-        variant: "destructive",
+        title: "Welcome to our AI Image Generator!",
+        description: "No sign-up required! Your images will be saved for 30 minutes.",
       });
     }
   }, [isAuthenticated, toast]);
 
   const handleGenerate = async () => {
-    if (!isAuthenticated) {
-      toast({
-        title: "Authentication Required",
-        description: "Please sign in to use the image generator",
-        variant: "destructive",
-      });
-      return;
-    }
-
+    // Remove authentication check
     if (!prompt.trim()) {
       toast({
         title: "Please enter a prompt",
@@ -86,7 +77,7 @@ const ImageGenerator = () => {
 
       toast({
         title: "Success!",
-        description: `${numberOfImages} image${numberOfImages > 1 ? 's' : ''} generated successfully.`,
+        description: `${numberOfImages} image${numberOfImages > 1 ? 's' : ''} generated successfully. Available for 30 minutes.`,
       });
     } catch (error) {
       console.error('Error generating image:', error);
@@ -108,8 +99,8 @@ const ImageGenerator = () => {
           AI Image Generator Pro
         </h2>
         <p className="text-muted-foreground max-w-2xl mx-auto">
-          Transform your ideas into stunning visuals with our advanced AI technology.
-          Create unique, high-quality images in seconds.
+          Generate AI images easily! Just enter your prompt, select an art style, and get high-quality images instantly.
+          No sign-up required! Your images will be saved for 30 minutes.
         </p>
       </div>
 
