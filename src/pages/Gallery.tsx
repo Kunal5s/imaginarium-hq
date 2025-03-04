@@ -3,46 +3,20 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
-import { ImageIcon, Lock } from "lucide-react";
+import { ImageIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { useAuth } from "@/hooks/useAuth";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
 const Gallery = () => {
   const [savedImages, setSavedImages] = useState<string[]>([]);
-  const { isAuthenticated } = useAuth();
   const navigate = useNavigate();
   
   useEffect(() => {
-    if (isAuthenticated) {
-      // For demonstration purposes only - in a real app, this would load from a database
-      const localImages = localStorage.getItem('generatedImages');
-      if (localImages) {
-        setSavedImages(JSON.parse(localImages));
-      }
+    // Load images from localStorage
+    const localImages = localStorage.getItem('generatedImages');
+    if (localImages) {
+      setSavedImages(JSON.parse(localImages));
     }
-  }, [isAuthenticated]);
-
-  if (!isAuthenticated) {
-    return (
-      <div className="min-h-screen bg-background">
-        <Navbar />
-        <main className="container mx-auto pt-24 pb-16 flex items-center justify-center">
-          <div className="max-w-md text-center">
-            <Lock className="h-16 w-16 mx-auto mb-4 text-muted-foreground" />
-            <h1 className="text-3xl font-bold mb-2">Authentication Required</h1>
-            <p className="text-muted-foreground mb-6">
-              Please sign in to view your gallery of generated images.
-            </p>
-            <Button onClick={() => navigate("/login")}>
-              Sign In
-            </Button>
-          </div>
-        </main>
-        <Footer />
-      </div>
-    );
-  }
+  }, []);
 
   return (
     <div className="min-h-screen bg-background">
@@ -68,8 +42,31 @@ const Gallery = () => {
                     className="w-full aspect-square object-cover transition-transform duration-300 group-hover:scale-105"
                   />
                   <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-end">
-                    <div className="p-4 w-full">
+                    <div className="p-4 w-full flex justify-between items-center">
                       <p className="text-white text-sm">Artwork #{index + 1}</p>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="text-white bg-black/40 hover:bg-black/60"
+                        onClick={async () => {
+                          try {
+                            const response = await fetch(imageUrl);
+                            const blob = await response.blob();
+                            const url = window.URL.createObjectURL(blob);
+                            const link = document.createElement('a');
+                            link.href = url;
+                            link.download = `ai-generated-image-${index + 1}.png`;
+                            document.body.appendChild(link);
+                            link.click();
+                            document.body.removeChild(link);
+                            window.URL.revokeObjectURL(url);
+                          } catch (error) {
+                            console.error('Download error:', error);
+                          }
+                        }}
+                      >
+                        Download
+                      </Button>
                     </div>
                   </div>
                 </div>
