@@ -25,6 +25,13 @@ const PayPalSubscription = ({ onSubscriptionComplete }: PayPalSubscriptionProps)
   useEffect(() => {
     // Load the PayPal script
     const loadPayPalScript = () => {
+      // Check if script is already loaded
+      if (document.querySelector('script[src*="paypal.com/sdk/js"]')) {
+        setScriptLoaded(true);
+        setLoading(false);
+        return;
+      }
+      
       const script = document.createElement('script');
       script.src = `https://www.paypal.com/sdk/js?client-id=${PAYPAL_CLIENT_ID}&vault=true&intent=subscription`;
       script.async = true;
@@ -43,15 +50,19 @@ const PayPalSubscription = ({ onSubscriptionComplete }: PayPalSubscriptionProps)
 
     // Cleanup
     return () => {
-      const paypalScript = document.querySelector('script[src*="paypal.com/sdk/js"]');
-      if (paypalScript) {
-        paypalScript.remove();
-      }
+      // We don't remove the script on component unmount anymore
+      // to prevent script reloading issues when component remounts
     };
   }, []);
 
   useEffect(() => {
-    if (scriptLoaded && window.paypal) {
+    if (scriptLoaded && window.paypal && document.getElementById('paypal-button-container')) {
+      // Clear the container first to prevent duplicate buttons
+      const container = document.getElementById('paypal-button-container');
+      if (container) {
+        container.innerHTML = '';
+      }
+      
       // Render the PayPal button
       window.paypal.Buttons({
         style: {

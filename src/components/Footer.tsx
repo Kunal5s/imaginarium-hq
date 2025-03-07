@@ -1,9 +1,16 @@
 
 import React from "react";
 import { Link } from "react-router-dom";
-import { Info, Mail, Shield, Cookie, MoveRight, Github, Twitter, Facebook, Instagram } from "lucide-react";
+import { Info, Mail, Shield, Cookie, MoveRight, Github, Twitter, Facebook, Instagram, Crown } from "lucide-react";
 
 const Footer = () => {
+  const scrollToPricing = () => {
+    const pricingSection = document.getElementById('pricing');
+    if (pricingSection) {
+      pricingSection.scrollIntoView({ behavior: 'smooth' });
+    }
+  };
+
   return (
     <footer className="bg-black py-12 mt-16 border-t border-red-900/30">
       <div className="container mx-auto px-4">
@@ -38,6 +45,19 @@ const Footer = () => {
                   <MoveRight className="h-4 w-4 text-red-700" />
                   Home
                 </Link>
+              </li>
+              <li>
+                <a 
+                  href="#pricing" 
+                  className="text-slate-300 hover:text-red-500 flex items-center gap-2 transition-colors cursor-pointer"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    scrollToPricing();
+                  }}
+                >
+                  <Crown className="h-4 w-4 text-red-700" />
+                  Pricing
+                </a>
               </li>
               <li>
                 <Link to="/about" className="text-slate-300 hover:text-red-500 flex items-center gap-2 transition-colors">
