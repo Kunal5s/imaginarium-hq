@@ -4,7 +4,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { AlertCircle, CheckCircle2 } from "lucide-react";
+import { AlertCircle, CheckCircle2, RefreshCcw } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
 // PayPal client ID - this is a public key that can be exposed in the frontend
@@ -19,49 +19,61 @@ const PayPalSubscription = ({ onSubscriptionComplete }: PayPalSubscriptionProps)
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [scriptLoaded, setScriptLoaded] = useState(false);
+  const [retryCount, setRetryCount] = useState(0);
   const { toast } = useToast();
   const { user } = useAuth();
 
-  useEffect(() => {
-    // Load the PayPal script
-    const loadPayPalScript = () => {
-      // Check if script is already loaded
-      if (document.querySelector('script[src*="paypal.com/sdk/js"]')) {
-        setScriptLoaded(true);
-        setLoading(false);
-        return;
-      }
-      
-      const script = document.createElement('script');
-      script.src = `https://www.paypal.com/sdk/js?client-id=${PAYPAL_CLIENT_ID}&vault=true&intent=subscription`;
-      script.async = true;
-      script.onload = () => {
-        setScriptLoaded(true);
-        setLoading(false);
-      };
-      script.onerror = () => {
-        setError("Failed to load PayPal script. Please try again later.");
-        setLoading(false);
-      };
-      document.body.appendChild(script);
+  const loadPayPalScript = () => {
+    // Remove any existing PayPal scripts first to avoid conflicts
+    const existingScripts = document.querySelectorAll('script[src*="paypal.com/sdk/js"]');
+    existingScripts.forEach(script => script.remove());
+    
+    setLoading(true);
+    setError(null);
+    
+    const script = document.createElement('script');
+    script.src = `https://www.paypal.com/sdk/js?client-id=${PAYPAL_CLIENT_ID}&vault=true&intent=subscription&components=buttons&currency=USD`;
+    script.async = true;
+    script.dataset.orderid = Date.now().toString(); // Add unique identifier to prevent caching issues
+    
+    script.onload = () => {
+      console.log("PayPal script loaded successfully");
+      setScriptLoaded(true);
+      setLoading(false);
     };
+    
+    script.onerror = () => {
+      console.error("Failed to load PayPal script");
+      setError("Failed to load PayPal payment system. Please try again later.");
+      setLoading(false);
+    };
+    
+    document.body.appendChild(script);
+  };
 
+  useEffect(() => {
     loadPayPalScript();
-
+    
     // Cleanup
     return () => {
-      // We don't remove the script on component unmount anymore
-      // to prevent script reloading issues when component remounts
+      // Don't remove script on unmount to prevent flickering on remount
     };
-  }, []);
+  }, [retryCount]);
 
   useEffect(() => {
-    if (scriptLoaded && window.paypal && document.getElementById('paypal-button-container')) {
-      // Clear the container first to prevent duplicate buttons
-      const container = document.getElementById('paypal-button-container');
-      if (container) {
-        container.innerHTML = '';
-      }
+    if (!scriptLoaded || !window.paypal) return;
+
+    const container = document.getElementById('paypal-button-container');
+    if (!container) {
+      console.error("PayPal container not found");
+      return;
+    }
+    
+    // Clear the container first to prevent duplicate buttons
+    container.innerHTML = '';
+    
+    try {
+      console.log("Rendering PayPal buttons");
       
       // Render the PayPal button
       window.paypal.Buttons({
@@ -71,18 +83,20 @@ const PayPalSubscription = ({ onSubscriptionComplete }: PayPalSubscriptionProps)
           layout: 'vertical',
           label: 'subscribe'
         },
-        createSubscription: function(data: any, actions: any) {
+        // When the button is clicked
+        createOrder: function() {
+          return PAYPAL_PLAN_ID;
+        },
+        createSubscription: function(data, actions) {
+          console.log("Creating subscription with plan ID:", PAYPAL_PLAN_ID);
           return actions.subscription.create({
             plan_id: PAYPAL_PLAN_ID
           });
         },
-        onApprove: function(data: any, actions: any) {
-          // In a real application, this would make a backend API call
-          // to verify and activate the subscription
-          console.log("Subscription successful:", data);
+        onApprove: function(data, actions) {
+          console.log("Subscription approved:", data);
           
           // Store subscription data in localStorage for demo purposes
-          // In a real app, this would be stored in a database
           if (user?.id) {
             const expiry = new Date();
             expiry.setDate(expiry.getDate() + 30); // 30 day subscription
@@ -99,8 +113,9 @@ const PayPalSubscription = ({ onSubscriptionComplete }: PayPalSubscriptionProps)
           
           onSubscriptionComplete(true);
         },
-        onError: function(err: any) {
+        onError: function(err) {
           console.error("PayPal Error:", err);
+          setError("Payment processing error. Please try again or contact support.");
           toast({
             title: "Subscription Failed",
             description: "There was an error processing your subscription. Please try again.",
@@ -108,26 +123,48 @@ const PayPalSubscription = ({ onSubscriptionComplete }: PayPalSubscriptionProps)
           });
           onSubscriptionComplete(false);
         }
-      }).render('#paypal-button-container');
+      }).render('#paypal-button-container').catch(err => {
+        console.error("Error rendering PayPal buttons:", err);
+        setError("Unable to display payment options. Please try again later.");
+      });
+    } catch (err) {
+      console.error("Error setting up PayPal:", err);
+      setError("Payment system initialization failed. Please try again later.");
     }
   }, [scriptLoaded, user, toast, onSubscriptionComplete]);
 
+  const handleRetry = () => {
+    setRetryCount(prev => prev + 1);
+  };
+
   if (loading) {
     return (
-      <div className="text-center py-6">
+      <div className="text-center py-8">
         <div className="inline-block h-8 w-8 animate-spin rounded-full border-4 border-solid border-red-500 border-r-transparent"></div>
-        <p className="mt-2 text-sm text-muted-foreground">Loading payment options...</p>
+        <p className="mt-4 text-sm text-muted-foreground">Loading payment options...</p>
+        <p className="text-xs text-muted-foreground">This may take a few moments</p>
       </div>
     );
   }
 
   if (error) {
     return (
-      <Alert variant="destructive" className="my-4">
-        <AlertCircle className="h-4 w-4" />
-        <AlertTitle>Error</AlertTitle>
-        <AlertDescription>{error}</AlertDescription>
-      </Alert>
+      <div className="space-y-4">
+        <Alert variant="destructive" className="bg-red-950/30 border-red-800">
+          <AlertCircle className="h-4 w-4" />
+          <AlertTitle>Payment System Error</AlertTitle>
+          <AlertDescription>{error}</AlertDescription>
+        </Alert>
+        
+        <Button 
+          variant="outline" 
+          className="w-full border-red-700 text-red-400 hover:bg-red-900/20 mt-2"
+          onClick={handleRetry}
+        >
+          <RefreshCcw className="h-4 w-4 mr-2" />
+          Retry Loading Payment System
+        </Button>
+      </div>
     );
   }
 
@@ -155,7 +192,9 @@ const PayPalSubscription = ({ onSubscriptionComplete }: PayPalSubscriptionProps)
         </div>
       </div>
       
-      <div id="paypal-button-container" className="min-h-[150px]"></div>
+      <div id="paypal-button-container" className="min-h-[150px] bg-white/5 rounded-md p-2">
+        {/* PayPal button will render here */}
+      </div>
       
       <p className="text-xs text-muted-foreground mt-4 text-center">
         By subscribing, you agree to our Terms of Service and Privacy Policy

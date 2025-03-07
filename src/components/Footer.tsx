@@ -4,10 +4,14 @@ import { Link } from "react-router-dom";
 import { Info, Mail, Shield, Cookie, MoveRight, Github, Twitter, Facebook, Instagram, Crown } from "lucide-react";
 
 const Footer = () => {
-  const scrollToPricing = () => {
+  const scrollToPricing = (e: React.MouseEvent) => {
+    e.preventDefault();
     const pricingSection = document.getElementById('pricing');
     if (pricingSection) {
       pricingSection.scrollIntoView({ behavior: 'smooth' });
+    } else {
+      // If not on homepage, navigate to homepage with pricing section
+      window.location.href = '/#pricing';
     }
   };
 
@@ -50,14 +54,17 @@ const Footer = () => {
                 <a 
                   href="#pricing" 
                   className="text-slate-300 hover:text-red-500 flex items-center gap-2 transition-colors cursor-pointer"
-                  onClick={(e) => {
-                    e.preventDefault();
-                    scrollToPricing();
-                  }}
+                  onClick={scrollToPricing}
                 >
                   <Crown className="h-4 w-4 text-red-700" />
                   Pricing
                 </a>
+              </li>
+              <li>
+                <Link to="/profile" className="text-slate-300 hover:text-red-500 flex items-center gap-2 transition-colors">
+                  <MoveRight className="h-4 w-4 text-red-700" />
+                  My Account
+                </Link>
               </li>
               <li>
                 <Link to="/about" className="text-slate-300 hover:text-red-500 flex items-center gap-2 transition-colors">
@@ -111,6 +118,16 @@ const Footer = () => {
         
         <div className="border-t border-red-900/20 mt-8 pt-8 text-center text-slate-400">
           <p>&copy; {new Date().getFullYear()} Imaginarium. All rights reserved.</p>
+          <div className="mt-4 flex justify-center space-x-6">
+            <a 
+              href="#pricing" 
+              onClick={scrollToPricing}
+              className="text-red-500 hover:text-red-400 flex items-center gap-1"
+            >
+              <Crown className="h-4 w-4" />
+              Upgrade to Premium
+            </a>
+          </div>
         </div>
       </div>
     </footer>

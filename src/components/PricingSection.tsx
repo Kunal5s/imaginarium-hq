@@ -1,15 +1,16 @@
-
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Check, ExternalLink, Crown } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import PayPalSubscription from "@/components/PayPalSubscription";
+import { useToast } from "@/hooks/use-toast";
 
 const PricingSection = () => {
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, user } = useAuth();
   const navigate = useNavigate();
   const [showPayPal, setShowPayPal] = useState(false);
+  const { toast } = useToast();
 
   // Single premium plan
   const premiumPlan = {
@@ -42,20 +43,43 @@ const PricingSection = () => {
   const handleUpgradeClick = () => {
     if (!isAuthenticated) {
       // Redirect to login if not authenticated
+      toast({
+        title: "Login Required",
+        description: "Please login to upgrade to the premium plan",
+      });
       navigate('/login');
     } else {
-      // Show PayPal subscription component
-      setShowPayPal(true);
+      // Check if user already has premium
+      const isPremium = localStorage.getItem(`premium_${user?.id}`);
+      if (isPremium === "true") {
+        toast({
+          title: "Already Premium",
+          description: "You already have an active premium subscription!",
+        });
+        navigate('/profile');
+      } else {
+        // Show PayPal subscription component
+        setShowPayPal(true);
+      }
     }
   };
 
   const handleSubscriptionComplete = (success: boolean) => {
     if (success) {
       setShowPayPal(false);
+      toast({
+        title: "Subscription Successful",
+        description: "Welcome to premium! You now have unlimited access to all features.",
+      });
       // Redirect to profile page after successful subscription
       navigate('/profile');
     } else {
-      setShowPayPal(false);
+      // Keep the PayPal UI open so they can try again
+      toast({
+        title: "Subscription Not Completed",
+        description: "Your subscription was not completed. You can try again.",
+        variant: "destructive"
+      });
     }
   };
 
