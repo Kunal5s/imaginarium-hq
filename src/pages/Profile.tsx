@@ -9,6 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { User, Crown, Calendar, Clock, Image, LogOut, Settings } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
+import PayPalSubscription from "@/components/PayPalSubscription";
 
 const Profile = () => {
   const { user, isAuthenticated, logout } = useAuth();
@@ -17,6 +18,7 @@ const Profile = () => {
   const [dailyUsage, setDailyUsage] = useState(0);
   const [isPremium, setIsPremium] = useState(false);
   const [expiryDate, setExpiryDate] = useState<string | null>(null);
+  const [showPayPal, setShowPayPal] = useState(false);
 
   useEffect(() => {
     if (!isAuthenticated) {
@@ -31,19 +33,36 @@ const Profile = () => {
       setDailyUsage(count);
     }
 
-    // Simulate premium status check (in a real app, this would come from a database)
-    // For demo purposes, we'll just randomly assign premium status
+    // Check premium status
     const checkPremiumStatus = async () => {
       try {
-        // This would be a real API call in production
         const hasSubscription = localStorage.getItem(`premium_${user?.id}`);
         
         if (hasSubscription) {
           setIsPremium(true);
-          // Set expiry date (for demo - 30 days from today)
-          const expiry = new Date();
-          expiry.setDate(expiry.getDate() + 30);
-          setExpiryDate(expiry.toLocaleDateString());
+          
+          // Get expiry date
+          const storedExpiry = localStorage.getItem(`premium_expiry_${user?.id}`);
+          if (storedExpiry) {
+            const expiryDate = new Date(storedExpiry);
+            const now = new Date();
+            
+            // Check if subscription is expired
+            if (expiryDate > now) {
+              setExpiryDate(expiryDate.toLocaleDateString());
+            } else {
+              // Subscription expired
+              setIsPremium(false);
+              setExpiryDate(null);
+              localStorage.removeItem(`premium_${user?.id}`);
+              localStorage.removeItem(`premium_expiry_${user?.id}`);
+              toast({
+                title: "Subscription Expired",
+                description: "Your premium plan has expired. Please renew to continue enjoying premium features.",
+                variant: "destructive",
+              });
+            }
+          }
         }
       } catch (error) {
         console.error("Error checking premium status:", error);
@@ -51,7 +70,7 @@ const Profile = () => {
     };
 
     checkPremiumStatus();
-  }, [isAuthenticated, navigate, user]);
+  }, [isAuthenticated, navigate, user, toast]);
 
   const handleLogout = async () => {
     try {
@@ -67,21 +86,23 @@ const Profile = () => {
     }
   };
 
-  const handleUpgrade = () => {
-    // For demo purposes, let's just set premium status in localStorage
-    localStorage.setItem(`premium_${user?.id}`, "true");
-    
-    // Set expiry date (30 days from today)
-    const expiry = new Date();
-    expiry.setDate(expiry.getDate() + 30);
-    
-    setIsPremium(true);
-    setExpiryDate(expiry.toLocaleDateString());
-    
-    toast({
-      title: "Premium Activated!",
-      description: "Thank you for upgrading to our premium plan!",
-    });
+  const handleSubscriptionComplete = (success: boolean) => {
+    if (success) {
+      // Update UI to show premium status
+      setIsPremium(true);
+      const expiry = new Date();
+      expiry.setDate(expiry.getDate() + 30);
+      setExpiryDate(expiry.toLocaleDateString());
+      setShowPayPal(false);
+    }
+  };
+
+  const handleUpgradeClick = () => {
+    setShowPayPal(true);
+  };
+
+  const handleCancelUpgrade = () => {
+    setShowPayPal(false);
   };
 
   return (
@@ -158,58 +179,73 @@ const Profile = () => {
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
-                {isPremium ? (
+                {!showPayPal && (
                   <>
-                    <div className="p-4 bg-red-900/20 rounded-lg border border-red-700">
-                      <h3 className="font-medium text-red-400 mb-2">Premium Plan</h3>
-                      <p className="text-sm text-muted-foreground mb-2">
-                        Your subscription is active until {expiryDate}
-                      </p>
-                      <ul className="list-disc list-inside space-y-1 text-sm text-muted-foreground">
-                        <li>Unlimited image generation</li>
-                        <li>Access to all premium models</li>
-                        <li>Priority processing</li>
-                        <li>Premium support</li>
-                      </ul>
-                    </div>
+                    {isPremium ? (
+                      <div className="p-4 bg-red-900/20 rounded-lg border border-red-700">
+                        <h3 className="font-medium text-red-400 mb-2">Premium Plan</h3>
+                        <p className="text-sm text-muted-foreground mb-2">
+                          Your subscription is active until {expiryDate}
+                        </p>
+                        <ul className="list-disc list-inside space-y-1 text-sm text-muted-foreground">
+                          <li>Unlimited image generation</li>
+                          <li>Access to all premium models</li>
+                          <li>Priority processing</li>
+                          <li>Premium support</li>
+                        </ul>
+                      </div>
+                    ) : (
+                      <>
+                        <div className="p-4 bg-black/40 rounded-lg border border-gray-700">
+                          <h3 className="font-medium text-gray-300 mb-2">Free Plan</h3>
+                          <p className="text-sm text-muted-foreground mb-2">
+                            Your current plan includes:
+                          </p>
+                          <ul className="list-disc list-inside space-y-1 text-sm text-muted-foreground">
+                            <li>10 images per day</li>
+                            <li>Access to basic models</li>
+                            <li>Standard quality</li>
+                          </ul>
+                        </div>
+                        
+                        <div className="p-4 bg-red-900/20 rounded-lg border border-red-700">
+                          <h3 className="font-medium text-red-400 mb-2">Premium Plan - $30</h3>
+                          <p className="text-sm text-muted-foreground mb-2">
+                            One-time payment for all premium features:
+                          </p>
+                          <ul className="list-disc list-inside space-y-1 text-sm text-muted-foreground">
+                            <li>Unlimited image generation</li>
+                            <li>Access to all premium models</li>
+                            <li>Priority processing</li>
+                            <li>Premium support</li>
+                          </ul>
+                        </div>
+                      </>
+                    )}
                   </>
-                ) : (
-                  <>
-                    <div className="p-4 bg-black/40 rounded-lg border border-gray-700">
-                      <h3 className="font-medium text-gray-300 mb-2">Free Plan</h3>
-                      <p className="text-sm text-muted-foreground mb-2">
-                        Your current plan includes:
-                      </p>
-                      <ul className="list-disc list-inside space-y-1 text-sm text-muted-foreground">
-                        <li>10 images per day</li>
-                        <li>Access to basic models</li>
-                        <li>Standard quality</li>
-                      </ul>
-                    </div>
-                    
-                    <div className="p-4 bg-red-900/20 rounded-lg border border-red-700">
-                      <h3 className="font-medium text-red-400 mb-2">Premium Plan - $30</h3>
-                      <p className="text-sm text-muted-foreground mb-2">
-                        One-time payment for all premium features:
-                      </p>
-                      <ul className="list-disc list-inside space-y-1 text-sm text-muted-foreground">
-                        <li>Unlimited image generation</li>
-                        <li>Access to all premium models</li>
-                        <li>Priority processing</li>
-                        <li>Premium support</li>
-                      </ul>
-                    </div>
-                  </>
+                )}
+
+                {showPayPal && (
+                  <PayPalSubscription onSubscriptionComplete={handleSubscriptionComplete} />
                 )}
               </CardContent>
               <CardFooter>
-                {!isPremium && (
+                {!isPremium && !showPayPal && (
                   <Button 
                     className="w-full bg-gradient-to-r from-red-600 to-red-800 hover:from-red-700 hover:to-red-900"
-                    onClick={handleUpgrade}
+                    onClick={handleUpgradeClick}
                   >
                     <Crown className="w-4 h-4 mr-2" />
                     Upgrade to Premium - $30 One-time
+                  </Button>
+                )}
+                {showPayPal && (
+                  <Button 
+                    variant="outline"
+                    className="w-full border-gray-700 text-gray-400 hover:bg-gray-900/20 mt-4"
+                    onClick={handleCancelUpgrade}
+                  >
+                    Cancel
                   </Button>
                 )}
                 {isPremium && (

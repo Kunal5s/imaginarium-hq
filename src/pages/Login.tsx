@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useAuth } from "@/hooks/useAuth";
-import { LogIn, UserPlus, Lock, Mail, AlertTriangle, Wifi, WifiOff } from "lucide-react";
+import { LogIn, UserPlus, Lock, Mail, AlertTriangle, Wifi, WifiOff, AlertCircle } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import Navbar from "@/components/Navbar";
@@ -26,6 +26,13 @@ const Login = () => {
       setErrorMsg(null);
     }
   }, [isOnline, errorMsg]);
+
+  // Validate email domain
+  const isValidEmail = (email: string) => {
+    const allowedDomains = ["gmail.com", "yahoo.com"];
+    const domain = email.split("@")[1]?.toLowerCase();
+    return allowedDomains.includes(domain);
+  };
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -59,6 +66,12 @@ const Login = () => {
     
     if (password.length < 6) {
       setErrorMsg("Password must be at least 6 characters long");
+      return;
+    }
+    
+    // Validate email domain
+    if (!isValidEmail(email)) {
+      setErrorMsg("Only Gmail and Yahoo email addresses are allowed");
       return;
     }
     
@@ -178,13 +191,17 @@ const Login = () => {
                         <Input
                           id="signup-email"
                           type="email"
-                          placeholder="you@example.com"
+                          placeholder="you@gmail.com or you@yahoo.com"
                           value={email}
                           onChange={(e) => setEmail(e.target.value)}
                           className="pl-10"
                           required
                         />
                       </div>
+                      <p className="text-xs text-muted-foreground flex items-center gap-1">
+                        <AlertCircle className="h-3 w-3" />
+                        Only Gmail and Yahoo email addresses are allowed
+                      </p>
                     </div>
                     <div className="space-y-2">
                       <Label htmlFor="signup-password">Password</Label>

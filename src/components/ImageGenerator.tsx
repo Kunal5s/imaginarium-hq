@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { useToast } from "@/hooks/use-toast";
 import GeneratorForm from "./image-generator/GeneratorForm";
@@ -14,9 +13,11 @@ import {
 import { Progress } from "@/components/ui/progress";
 import { AI_MODELS } from "./image-generator/constants";
 import { Button } from "@/components/ui/button";
-import { Download, DownloadCloud } from "lucide-react";
+import { Download, DownloadCloud, AlertTriangle, Lock } from "lucide-react";
 import { useTheme } from "@/hooks/useTheme";
 import { useAuth } from "@/hooks/useAuth";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { useNavigate } from "react-router-dom";
 
 const ImageGenerator = () => {
   const [prompt, setPrompt] = useState("");
@@ -35,42 +36,71 @@ const ImageGenerator = () => {
   const [estimatedTime, setEstimatedTime] = useState(0);
   const [retryCount, setRetryCount] = useState(0);
   const [isDownloading, setIsDownloading] = useState(false);
+  
+  const huggingFaceApiKey = "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";
+
+  const [dailyGenerationCount, setDailyGenerationCount] = useState(0);
+  const [isPremium, setIsPremium] = useState(false);
+  const FREE_USER_DAILY_LIMIT = 10;
+  
   const { toast } = useToast();
   const { theme } = useTheme();
   const { isAuthenticated, user } = useAuth();
-  
-  // Updated Hugging Face API key
-  const huggingFaceApiKey = "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";
+  const navigate = useNavigate();
 
-  // Track usage for free users
-  const [dailyGenerationCount, setDailyGenerationCount] = useState(0);
-  const FREE_USER_DAILY_LIMIT = 10;
-
-  // Welcome message
   useEffect(() => {
-    toast({
-      title: "Welcome to our AI Image Generator!",
-      description: isAuthenticated 
-        ? "Create amazing images with our professional tools." 
-        : "Login to access all features and generate up to 10 free images daily!",
-    });
-    
-    // Load usage data for authenticated users
-    if (isAuthenticated) {
-      const storedUsage = localStorage.getItem(`image_usage_${user?.id}`);
+    if (isAuthenticated && user) {
+      const hasSubscription = localStorage.getItem(`premium_${user.id}`);
+      if (hasSubscription) {
+        const storedExpiry = localStorage.getItem(`premium_expiry_${user.id}`);
+        if (storedExpiry) {
+          const expiryDate = new Date(storedExpiry);
+          const now = new Date();
+          
+          if (expiryDate > now) {
+            setIsPremium(true);
+          } else {
+            localStorage.removeItem(`premium_${user.id}`);
+            localStorage.removeItem(`premium_expiry_${user.id}`);
+          }
+        }
+      }
+      
+      const storedUsage = localStorage.getItem(`image_usage_${user.id}`);
       if (storedUsage) {
         const { count, date } = JSON.parse(storedUsage);
-        // Reset count if it's a new day
         const today = new Date().toDateString();
         if (date === today) {
           setDailyGenerationCount(count);
         } else {
-          // Reset for new day
-          localStorage.setItem(`image_usage_${user?.id}`, JSON.stringify({ count: 0, date: today }));
+          localStorage.setItem(`image_usage_${user.id}`, JSON.stringify({ count: 0, date: today }));
+          setDailyGenerationCount(0);
         }
       }
     }
-  }, [toast, isAuthenticated, user]);
+  }, [isAuthenticated, user]);
+
+  useEffect(() => {
+    toast({
+      title: "Welcome to our AI Image Generator!",
+      description: isAuthenticated 
+        ? isPremium 
+          ? "Create unlimited images with our premium tools!"
+          : "You can generate up to 10 free images daily. Upgrade to premium for unlimited access!" 
+        : "Login to access all features and generate up to 10 free images daily!",
+    });
+  }, [toast, isAuthenticated, isPremium]);
+
+  const updateUsageCount = () => {
+    if (isAuthenticated && user) {
+      const newCount = dailyGenerationCount + 1;
+      setDailyGenerationCount(newCount);
+      localStorage.setItem(`image_usage_${user.id}`, JSON.stringify({
+        count: newCount,
+        date: new Date().toDateString()
+      }));
+    }
+  };
 
   const handleGenerate = async () => {
     if (!prompt.trim()) {
@@ -81,44 +111,32 @@ const ImageGenerator = () => {
       return;
     }
 
-    // Check for authenticated users and their limits
-    if (isAuthenticated) {
-      // Check if free user has reached daily limit
-      if (dailyGenerationCount >= FREE_USER_DAILY_LIMIT) {
-        toast({
-          title: "Daily limit reached",
-          description: "You've reached your daily limit of 10 free images. Upgrade to Premium for unlimited access!",
-          variant: "destructive",
-        });
-        return;
-      }
-    } else {
-      // Allow guests some limited functionality but encourage login
-      if (numberOfImages > 2) {
-        toast({
-          title: "Login required",
-          description: "Please login to generate more than 2 images at once.",
-          variant: "destructive",
-        });
-        return;
-      }
+    if (!isAuthenticated) {
+      toast({
+        title: "Login required",
+        description: "Please login to generate images",
+        variant: "destructive",
+      });
+      navigate('/login');
+      return;
+    }
+
+    if (!isPremium && dailyGenerationCount >= FREE_USER_DAILY_LIMIT) {
+      toast({
+        title: "Daily limit reached",
+        description: "You've reached your daily limit of 10 free images. Upgrade to Premium for unlimited access!",
+        variant: "destructive",
+      });
+      navigate('/profile');
+      return;
     }
 
     setIsGenerating(true);
     setError(null);
     setGenerationProgress(0);
     
-    // Calculate and display estimated time - ensure it's under 50 seconds
     const timeEstimate = Math.min(getEstimatedTime(aiModel, numberOfImages), 50);
     setEstimatedTime(timeEstimate);
-    
-    // Show toast for long-running generations
-    if (timeEstimate > 30) {
-      toast({
-        title: "Generating your images...",
-        description: `This may take up to ${timeEstimate} seconds to create ${numberOfImages} image${numberOfImages > 1 ? 's' : ''}. Please be patient.`,
-      });
-    }
     
     try {
       let images: string[] = [];
@@ -139,14 +157,11 @@ const ImageGenerator = () => {
             variant: "destructive",
           });
           
-          // Switch to Hugging Face as fallback
           setGenerationMethod("huggingface");
         }
       }
       
-      // If OpenAI failed or if Hugging Face was selected initially
       if (generationMethod === "huggingface" || images.length === 0) {
-        // Hugging Face API generation
         let enhancedPrompt = prompt.trim();
         if (artStyle) {
           enhancedPrompt = `${enhancedPrompt}, in the style of ${artStyle}, high quality, detailed, 8k resolution`;
@@ -163,11 +178,9 @@ const ImageGenerator = () => {
             setGenerationProgress
           );
           
-          // Verify we got the correct number of images
           if (images.length < numberOfImages) {
             console.log(`Only generated ${images.length}/${numberOfImages} images, attempting to get more...`);
             
-            // Try to generate more images to reach the requested count
             const remainingCount = numberOfImages - images.length;
             if (remainingCount > 0) {
               const moreImages = await generateImageWithHuggingFace(
@@ -186,7 +199,6 @@ const ImageGenerator = () => {
         } catch (error) {
           console.error('Error in primary model, trying fallback:', error);
           
-          // If first attempt failed, try with a fallback model
           if (retryCount === 0) {
             setRetryCount(1);
             const fallbackModel = getFallbackModel(aiModel);
@@ -201,12 +213,12 @@ const ImageGenerator = () => {
               fallbackModel, 
               huggingFaceApiKey,
               aspectRatio,
-              numberOfImages, // Try to generate the full requested number
+              numberOfImages,
               imageQuality,
               setGenerationProgress
             );
           } else {
-            throw error; // If fallback also failed, throw the error
+            throw error;
           }
         }
       }
@@ -216,19 +228,11 @@ const ImageGenerator = () => {
         setSelectedImage(images[0]);
       }
 
-      // Update usage count for authenticated users
-      if (isAuthenticated && user) {
-        const newCount = dailyGenerationCount + 1;
-        setDailyGenerationCount(newCount);
-        localStorage.setItem(`image_usage_${user.id}`, JSON.stringify({
-          count: newCount,
-          date: new Date().toDateString()
-        }));
-      }
+      updateUsageCount();
 
       toast({
         title: "Success!",
-        description: `${images.length} image${images.length > 1 ? 's' : ''} generated successfully. Available for 30 minutes.`,
+        description: `${images.length} image${images.length > 1 ? 's' : ''} generated successfully.`,
       });
     } catch (error) {
       console.error('Error generating image:', error);
@@ -246,7 +250,6 @@ const ImageGenerator = () => {
     }
   };
   
-  // Handle downloading the selected image
   const handleDownloadImage = async () => {
     if (!selectedImage) return;
     
@@ -271,7 +274,6 @@ const ImageGenerator = () => {
     }
   };
   
-  // Handle downloading all generated images
   const handleDownloadAllImages = async () => {
     if (generatedImages.length === 0) return;
     
@@ -307,10 +309,31 @@ const ImageGenerator = () => {
           {isAuthenticated ? " Access all premium features with your account." : " Login for more features!"}
         </p>
         
-        {isAuthenticated && (
-          <div className="text-sm text-muted-foreground">
-            <span>Daily generation count: {dailyGenerationCount}/{FREE_USER_DAILY_LIMIT}</span>
+        {isAuthenticated && !isPremium && (
+          <div className="text-sm">
+            <span className={`font-medium ${dailyGenerationCount >= FREE_USER_DAILY_LIMIT ? "text-red-500" : "text-muted-foreground"}`}>
+              Daily generation count: {dailyGenerationCount}/{FREE_USER_DAILY_LIMIT}
+            </span>
+            {dailyGenerationCount >= FREE_USER_DAILY_LIMIT && (
+              <Button
+                variant="link"
+                onClick={() => navigate('/profile')}
+                className="text-red-500 text-sm p-0 h-auto font-medium ml-2"
+              >
+                Upgrade to Premium
+              </Button>
+            )}
           </div>
+        )}
+        
+        {!isAuthenticated && (
+          <Alert className="bg-red-900/20 border-red-800 max-w-lg mx-auto">
+            <Lock className="h-4 w-4 text-red-500" />
+            <AlertTitle className="text-red-500">Login required</AlertTitle>
+            <AlertDescription className="text-muted-foreground">
+              Please login to access all features and generate up to 10 free images daily.
+            </AlertDescription>
+          </Alert>
         )}
       </div>
 
@@ -362,7 +385,6 @@ const ImageGenerator = () => {
         isGenerating={isGenerating}
       />
       
-      {/* Download buttons */}
       {generatedImages.length > 0 && (
         <div className="flex flex-col sm:flex-row gap-4 justify-center mt-6">
           <Button 
