@@ -2,13 +2,15 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { Menu, Moon, Sun, X } from "lucide-react";
+import { Menu, Moon, Sun, X, LogIn } from "lucide-react";
 import { useTheme } from "@/hooks/useTheme";
+import { useAuth } from "@/hooks/useAuth";
 
 const Navbar = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const navigate = useNavigate();
   const { theme, setTheme } = useTheme();
+  const { isAuthenticated, logout } = useAuth();
 
   return (
     <nav className="fixed top-0 left-0 right-0 z-50 bg-background/80 backdrop-blur-md border-b">
@@ -21,13 +23,33 @@ const Navbar = () => {
           </div>
 
           {/* Desktop Menu */}
-          <div className="hidden md:flex items-center space-x-8">
+          <div className="hidden md:flex items-center space-x-4">
             <a href="/" className="text-sm hover:text-primary transition-colors">
               Home
             </a>
             <a href="/gallery" className="text-sm hover:text-primary transition-colors">
               Gallery
             </a>
+            
+            {isAuthenticated ? (
+              <Button 
+                variant="outline" 
+                size="sm"
+                onClick={logout}
+              >
+                Logout
+              </Button>
+            ) : (
+              <Button 
+                variant="outline" 
+                size="sm"
+                onClick={() => navigate('/login')}
+              >
+                <LogIn className="h-4 w-4 mr-2" />
+                Login
+              </Button>
+            )}
+            
             <Button
               variant="ghost"
               size="icon"
@@ -77,6 +99,27 @@ const Navbar = () => {
             >
               Gallery
             </a>
+            
+            {isAuthenticated ? (
+              <Button 
+                variant="outline" 
+                size="sm"
+                onClick={logout}
+                className="w-full"
+              >
+                Logout
+              </Button>
+            ) : (
+              <Button 
+                variant="outline" 
+                size="sm"
+                onClick={() => navigate('/login')}
+                className="w-full"
+              >
+                <LogIn className="h-4 w-4 mr-2" />
+                Login
+              </Button>
+            )}
           </div>
         )}
       </div>
