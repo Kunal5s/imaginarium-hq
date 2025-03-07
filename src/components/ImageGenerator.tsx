@@ -16,6 +16,7 @@ import { AI_MODELS } from "./image-generator/constants";
 import { Button } from "@/components/ui/button";
 import { Download, DownloadCloud } from "lucide-react";
 import { useTheme } from "@/hooks/useTheme";
+import { useAuth } from "@/hooks/useAuth";
 
 const ImageGenerator = () => {
   const [prompt, setPrompt] = useState("");
@@ -36,17 +37,40 @@ const ImageGenerator = () => {
   const [isDownloading, setIsDownloading] = useState(false);
   const { toast } = useToast();
   const { theme } = useTheme();
+  const { isAuthenticated, user } = useAuth();
   
   // Updated Hugging Face API key
-  const huggingFaceApiKey = "hf_GgldukYybURdPGrMDrTWJVCMcuRw";
+  const huggingFaceApiKey = "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";
+
+  // Track usage for free users
+  const [dailyGenerationCount, setDailyGenerationCount] = useState(0);
+  const FREE_USER_DAILY_LIMIT = 10;
 
   // Welcome message
   useEffect(() => {
     toast({
       title: "Welcome to our AI Image Generator!",
-      description: "No sign-up required! Your images will be saved for 30 minutes.",
+      description: isAuthenticated 
+        ? "Create amazing images with our professional tools." 
+        : "Login to access all features and generate up to 10 free images daily!",
     });
-  }, [toast]);
+    
+    // Load usage data for authenticated users
+    if (isAuthenticated) {
+      const storedUsage = localStorage.getItem(`image_usage_${user?.id}`);
+      if (storedUsage) {
+        const { count, date } = JSON.parse(storedUsage);
+        // Reset count if it's a new day
+        const today = new Date().toDateString();
+        if (date === today) {
+          setDailyGenerationCount(count);
+        } else {
+          // Reset for new day
+          localStorage.setItem(`image_usage_${user?.id}`, JSON.stringify({ count: 0, date: today }));
+        }
+      }
+    }
+  }, [toast, isAuthenticated, user]);
 
   const handleGenerate = async () => {
     if (!prompt.trim()) {
@@ -55,6 +79,29 @@ const ImageGenerator = () => {
         variant: "destructive",
       });
       return;
+    }
+
+    // Check for authenticated users and their limits
+    if (isAuthenticated) {
+      // Check if free user has reached daily limit
+      if (dailyGenerationCount >= FREE_USER_DAILY_LIMIT) {
+        toast({
+          title: "Daily limit reached",
+          description: "You've reached your daily limit of 10 free images. Upgrade to Premium for unlimited access!",
+          variant: "destructive",
+        });
+        return;
+      }
+    } else {
+      // Allow guests some limited functionality but encourage login
+      if (numberOfImages > 2) {
+        toast({
+          title: "Login required",
+          description: "Please login to generate more than 2 images at once.",
+          variant: "destructive",
+        });
+        return;
+      }
     }
 
     setIsGenerating(true);
@@ -169,6 +216,16 @@ const ImageGenerator = () => {
         setSelectedImage(images[0]);
       }
 
+      // Update usage count for authenticated users
+      if (isAuthenticated && user) {
+        const newCount = dailyGenerationCount + 1;
+        setDailyGenerationCount(newCount);
+        localStorage.setItem(`image_usage_${user.id}`, JSON.stringify({
+          count: newCount,
+          date: new Date().toDateString()
+        }));
+      }
+
       toast({
         title: "Success!",
         description: `${images.length} image${images.length > 1 ? 's' : ''} generated successfully. Available for 30 minutes.`,
@@ -242,13 +299,19 @@ const ImageGenerator = () => {
   return (
     <div className="w-full max-w-5xl mx-auto p-6 space-y-8">
       <div className="space-y-4 text-center">
-        <h2 className="text-4xl font-bold tracking-tight bg-gradient-to-r from-purple-500 via-pink-500 to-indigo-500 bg-clip-text text-transparent">
+        <h2 className="text-4xl font-bold tracking-tight bg-gradient-to-r from-red-600 to-red-900 dark:from-red-500 dark:to-red-800 bg-clip-text text-transparent">
           AI Image Generator Pro
         </h2>
         <p className="text-muted-foreground max-w-2xl mx-auto">
           Generate AI images easily! Just enter your prompt, select an art style, and get high-quality images in under 50 seconds.
-          No sign-up required! Your images will be saved for 30 minutes.
+          {isAuthenticated ? " Access all premium features with your account." : " Login for more features!"}
         </p>
+        
+        {isAuthenticated && (
+          <div className="text-sm text-muted-foreground">
+            <span>Daily generation count: {dailyGenerationCount}/{FREE_USER_DAILY_LIMIT}</span>
+          </div>
+        )}
       </div>
 
       <GeneratorForm 
@@ -271,6 +334,7 @@ const ImageGenerator = () => {
         setArtStyle={setArtStyle}
         error={error}
         onGenerate={handleGenerate}
+        isAuthenticated={isAuthenticated}
       />
 
       {isGenerating && (
@@ -279,7 +343,9 @@ const ImageGenerator = () => {
             <span>Generating images...</span>
             <span>{generationProgress}%</span>
           </div>
-          <Progress value={generationProgress} className="h-2" />
+          <Progress value={generationProgress} className="h-2 bg-gray-700 dark:bg-gray-800">
+            <div className="h-full bg-gradient-to-r from-red-600 to-red-800 rounded-full"></div>
+          </Progress>
           {estimatedTime > 0 && (
             <p className="text-xs text-muted-foreground text-center">
               Estimated time: {estimatedTime} seconds. 
@@ -302,8 +368,7 @@ const ImageGenerator = () => {
           <Button 
             onClick={handleDownloadImage} 
             disabled={!selectedImage || isDownloading}
-            className="flex items-center gap-2"
-            variant={theme === "dark" ? "outline" : "default"}
+            className="flex items-center gap-2 bg-red-700 hover:bg-red-800 text-white"
           >
             <Download className="h-4 w-4" />
             Download Selected Image
@@ -313,8 +378,7 @@ const ImageGenerator = () => {
             <Button 
               onClick={handleDownloadAllImages} 
               disabled={isDownloading} 
-              className="flex items-center gap-2" 
-              variant={theme === "dark" ? "outline" : "secondary"}
+              className="flex items-center gap-2 bg-gray-800 hover:bg-gray-900 text-white"
             >
               <DownloadCloud className="h-4 w-4" />
               Download All Images

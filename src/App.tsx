@@ -13,6 +13,7 @@ import Cookies from "./pages/Cookies";
 import Terms from "./pages/Terms";
 import Gallery from "./pages/Gallery";
 import Login from "./pages/Login";
+import Profile from "./pages/Profile";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -45,6 +46,14 @@ const AppRoutes = () => {
         element={
           <ProtectedRoute>
             <Gallery />
+          </ProtectedRoute>
+        } 
+      />
+      <Route 
+        path="/profile" 
+        element={
+          <ProtectedRoute>
+            <Profile />
           </ProtectedRoute>
         } 
       />

@@ -2,9 +2,8 @@
 import React, { useEffect } from 'react';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Wand2, Palette, Settings2, AlertTriangle } from "lucide-react";
+import { Wand2, Palette, Settings2, AlertTriangle, Crown } from "lucide-react";
 import { useNavigate } from "react-router-dom";
-import { useAuth } from "@/hooks/useAuth";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import {
   Select,
@@ -39,6 +38,7 @@ interface GeneratorFormProps {
   setArtStyle: React.Dispatch<React.SetStateAction<string>>;
   error: string | null;
   onGenerate: () => Promise<void>;
+  isAuthenticated?: boolean;
 }
 
 const GeneratorForm: React.FC<GeneratorFormProps> = ({
@@ -60,10 +60,10 @@ const GeneratorForm: React.FC<GeneratorFormProps> = ({
   artStyle,
   setArtStyle,
   error,
-  onGenerate
+  onGenerate,
+  isAuthenticated = false
 }) => {
   const navigate = useNavigate();
-  const { isAuthenticated } = useAuth();
 
   // Available aspect ratios for the selected model
   const availableAspectRatios = AI_MODELS.find(model => model.id === aiModel)?.aspectRatios || ["1:1"];
@@ -77,17 +77,37 @@ const GeneratorForm: React.FC<GeneratorFormProps> = ({
   return (
     <div className="w-full space-y-4">
       {error && (
-        <Alert variant="destructive" className="my-4">
+        <Alert variant="destructive" className="my-4 border-red-500 bg-red-900/20">
           <AlertTriangle className="h-4 w-4" />
           <AlertTitle>Error</AlertTitle>
           <AlertDescription>{error}</AlertDescription>
         </Alert>
       )}
 
+      {!isAuthenticated && (
+        <Alert className="my-4 border-red-500 bg-red-900/20">
+          <Crown className="h-4 w-4" />
+          <AlertTitle>Login for More Features</AlertTitle>
+          <AlertDescription>
+            <div className="flex flex-col space-y-2">
+              <span>Create up to 10 free images daily with a free account.</span>
+              <Button 
+                variant="outline" 
+                size="sm" 
+                className="w-full sm:w-auto border-red-500 text-red-500 hover:bg-red-500 hover:text-white"
+                onClick={() => navigate('/login')}
+              >
+                Login Now
+              </Button>
+            </div>
+          </AlertDescription>
+        </Alert>
+      )}
+
       <Tabs defaultValue="generate" className="w-full">
-        <TabsList className="grid grid-cols-2">
-          <TabsTrigger value="generate">Generate</TabsTrigger>
-          <TabsTrigger value="advanced">Advanced Settings</TabsTrigger>
+        <TabsList className="grid grid-cols-2 bg-black/40">
+          <TabsTrigger value="generate" className="data-[state=active]:bg-red-700 data-[state=active]:text-white">Generate</TabsTrigger>
+          <TabsTrigger value="advanced" className="data-[state=active]:bg-red-700 data-[state=active]:text-white">Advanced Settings</TabsTrigger>
         </TabsList>
         
         <TabsContent value="generate" className="space-y-4">
@@ -97,10 +117,10 @@ const GeneratorForm: React.FC<GeneratorFormProps> = ({
                 value={generationMethod}
                 onValueChange={(value: "openai" | "huggingface") => setGenerationMethod(value)}
               >
-                <SelectTrigger>
+                <SelectTrigger className="border-gray-700 bg-black/20">
                   <SelectValue placeholder="Select generation method" />
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent className="bg-gray-900 border-gray-700">
                   <SelectItem value="huggingface">Hugging Face (Top-Quality Models)</SelectItem>
                   <SelectItem value="openai">OpenAI DALL-E</SelectItem>
                 </SelectContent>
@@ -111,10 +131,10 @@ const GeneratorForm: React.FC<GeneratorFormProps> = ({
                   value={aiModel}
                   onValueChange={setAiModel}
                 >
-                  <SelectTrigger>
+                  <SelectTrigger className="border-gray-700 bg-black/20">
                     <SelectValue placeholder="Select AI model" />
                   </SelectTrigger>
-                  <SelectContent className="max-h-[200px] overflow-y-auto">
+                  <SelectContent className="max-h-[200px] overflow-y-auto bg-gray-900 border-gray-700">
                     {AI_MODELS.map((model) => (
                       <SelectItem key={model.id} value={model.id}>
                         {model.name}
@@ -129,10 +149,10 @@ const GeneratorForm: React.FC<GeneratorFormProps> = ({
                   value={imageSize}
                   onValueChange={setImageSize}
                 >
-                  <SelectTrigger>
+                  <SelectTrigger className="border-gray-700 bg-black/20">
                     <SelectValue placeholder="Select size" />
                   </SelectTrigger>
-                  <SelectContent>
+                  <SelectContent className="bg-gray-900 border-gray-700">
                     <SelectItem value="1024x1024">1024 × 1024</SelectItem>
                     <SelectItem value="1024x1792">1024 × 1792</SelectItem>
                     <SelectItem value="1792x1024">1792 × 1024</SelectItem>
@@ -145,10 +165,10 @@ const GeneratorForm: React.FC<GeneratorFormProps> = ({
               {generationMethod === "huggingface" && (
                 <>
                   <Select value={aspectRatio} onValueChange={setAspectRatio}>
-                    <SelectTrigger>
+                    <SelectTrigger className="border-gray-700 bg-black/20">
                       <SelectValue placeholder="Aspect Ratio" />
                     </SelectTrigger>
-                    <SelectContent className="max-h-[200px] overflow-y-auto">
+                    <SelectContent className="max-h-[200px] overflow-y-auto bg-gray-900 border-gray-700">
                       <SelectItem value="1:1">1:1 Square</SelectItem>
                       <SelectItem value="16:9">16:9 Landscape</SelectItem>
                       <SelectItem value="9:16">9:16 Portrait</SelectItem>
@@ -177,10 +197,10 @@ const GeneratorForm: React.FC<GeneratorFormProps> = ({
                     value={numberOfImages.toString()}
                     onValueChange={(value) => setNumberOfImages(parseInt(value))}
                   >
-                    <SelectTrigger>
+                    <SelectTrigger className="border-gray-700 bg-black/20">
                       <SelectValue placeholder="Number of Images" />
                     </SelectTrigger>
-                    <SelectContent>
+                    <SelectContent className="bg-gray-900 border-gray-700">
                       <SelectItem value="1">1 Image</SelectItem>
                       <SelectItem value="2">2 Images</SelectItem>
                       <SelectItem value="3">3 Images</SelectItem>
@@ -199,14 +219,14 @@ const GeneratorForm: React.FC<GeneratorFormProps> = ({
                 placeholder="Describe your imagination in detail... (e.g., 'A magical forest with glowing mushrooms and fairies')"
                 value={prompt}
                 onChange={(e) => setPrompt(e.target.value)}
-                className="flex-1"
+                className="flex-1 border-gray-700 bg-black/20"
               />
             </div>
 
             <Button
               onClick={onGenerate}
               disabled={isGenerating}
-              className="w-full md:w-auto relative overflow-hidden group bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700"
+              className="w-full md:w-auto relative overflow-hidden group bg-gradient-to-r from-red-600 to-red-900 hover:from-red-700 hover:to-red-950"
             >
               <span className="flex items-center gap-2">
                 <Wand2 className="h-4 w-4" />
@@ -217,11 +237,11 @@ const GeneratorForm: React.FC<GeneratorFormProps> = ({
         </TabsContent>
         
         <TabsContent value="advanced" className="space-y-4">
-          <Card>
+          <Card className="border-gray-700 bg-black/20">
             <CardContent className="pt-6">
               <div className="space-y-4">
                 <div>
-                  <h3 className="text-lg font-medium mb-2">Image Quality</h3>
+                  <h3 className="text-lg font-medium mb-2 text-red-500">Image Quality</h3>
                   <div className="flex items-center gap-4">
                     <span className="text-sm">Low</span>
                     <Slider
@@ -237,7 +257,7 @@ const GeneratorForm: React.FC<GeneratorFormProps> = ({
                 </div>
                 
                 <div>
-                  <h3 className="text-lg font-medium mb-2">Tips for Better Results</h3>
+                  <h3 className="text-lg font-medium mb-2 text-red-500">Tips for Better Results</h3>
                   <ul className="list-disc list-inside space-y-1 text-sm text-muted-foreground">
                     <li>Be detailed in your description</li>
                     <li>Specify lighting, mood, and perspective</li>
@@ -246,10 +266,10 @@ const GeneratorForm: React.FC<GeneratorFormProps> = ({
                   </ul>
                 </div>
                 
-                <div className="bg-primary/10 p-4 rounded-lg mt-4">
-                  <h3 className="text-lg font-medium mb-2">Upgrade to Premium</h3>
+                <div className="bg-red-900/20 p-4 rounded-lg mt-4 border border-red-700">
+                  <h3 className="text-lg font-medium mb-2 text-red-400">Premium Plan - Just $30</h3>
                   <p className="text-sm text-muted-foreground mb-2">
-                    For just $30, unlock exclusive features with secure Cashfree payment:
+                    Unlock exclusive features with secure payment:
                   </p>
                   <ul className="list-disc list-inside space-y-1 text-sm text-muted-foreground">
                     <li>Unlimited image generation</li>
@@ -258,7 +278,9 @@ const GeneratorForm: React.FC<GeneratorFormProps> = ({
                     <li>Higher resolution outputs</li>
                     <li>Priority processing</li>
                   </ul>
-                  <Button className="mt-3 w-full">Upgrade Now</Button>
+                  <Button className="mt-3 w-full bg-red-700 hover:bg-red-800 text-white">
+                    Upgrade Now - $30 One-time
+                  </Button>
                 </div>
               </div>
             </CardContent>
