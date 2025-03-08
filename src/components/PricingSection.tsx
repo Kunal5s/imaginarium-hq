@@ -48,12 +48,15 @@ const PricingSection = () => {
       });
       navigate('/login');
     } else {
-      // For now just show a toast - new payment system will be added later
-      toast({
-        title: "Coming Soon",
-        description: "New payment system will be available soon!",
-      });
-      // Here user would be marked as premium (placeholder for future implementation)
+      // Redirect to Buy Me a Coffee with return URL
+      window.location.href = "https://www.buymeacoffee.com/ultracinemabookfeed?redirect_to=https://imaginariumtool.netlify.app/success.html";
+    }
+  };
+
+  const scrollToPricing = () => {
+    const pricingSection = document.getElementById('pricing');
+    if (pricingSection) {
+      pricingSection.scrollIntoView({ behavior: 'smooth' });
     }
   };
 
