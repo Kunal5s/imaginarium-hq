@@ -3,14 +3,18 @@ interface PayPalActions {
   subscription: {
     create: (options: { plan_id: string }) => Promise<any>;
   };
+  order?: {
+    create: (options: any) => Promise<any>;
+  };
 }
 
 interface PayPalData {
   subscriptionID?: string;
+  orderID?: string;
 }
 
 interface PayPalButton {
-  render: (selector: string) => void;
+  render: (selector: string) => Promise<void>;
 }
 
 interface PayPalNamespace {
@@ -21,6 +25,7 @@ interface PayPalNamespace {
       layout: string;
       label: string;
     };
+    createOrder?: (data: any, actions: PayPalActions) => any;
     createSubscription: (data: any, actions: PayPalActions) => Promise<any>;
     onApprove: (data: PayPalData, actions: any) => void;
     onError?: (err: any) => void;

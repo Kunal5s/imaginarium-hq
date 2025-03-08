@@ -83,10 +83,6 @@ const PayPalSubscription = ({ onSubscriptionComplete }: PayPalSubscriptionProps)
           layout: 'vertical',
           label: 'subscribe'
         },
-        // When the button is clicked
-        createOrder: function() {
-          return PAYPAL_PLAN_ID;
-        },
         createSubscription: function(data, actions) {
           console.log("Creating subscription with plan ID:", PAYPAL_PLAN_ID);
           return actions.subscription.create({
