@@ -6,9 +6,12 @@ import { Info, Mail, Shield, Cookie, MoveRight, Github, Twitter, Facebook, Insta
 const Footer = () => {
   const scrollToPricing = (e: React.MouseEvent) => {
     e.preventDefault();
-    const pricingSection = document.getElementById('pricing');
-    if (pricingSection) {
-      pricingSection.scrollIntoView({ behavior: 'smooth' });
+    // Check if we're on the home page
+    if (window.location.pathname === '/') {
+      const pricingSection = document.getElementById('pricing');
+      if (pricingSection) {
+        pricingSection.scrollIntoView({ behavior: 'smooth' });
+      }
     } else {
       // If not on homepage, navigate to homepage with pricing section
       window.location.href = '/#pricing';
@@ -52,13 +55,19 @@ const Footer = () => {
               </li>
               <li>
                 <a 
-                  href="#pricing" 
+                  href="/#pricing" 
                   className="text-slate-300 hover:text-red-500 flex items-center gap-2 transition-colors cursor-pointer"
                   onClick={scrollToPricing}
                 >
                   <Crown className="h-4 w-4 text-red-700" />
                   Pricing
                 </a>
+              </li>
+              <li>
+                <Link to="/gallery" className="text-slate-300 hover:text-red-500 flex items-center gap-2 transition-colors">
+                  <MoveRight className="h-4 w-4 text-red-700" />
+                  Gallery
+                </Link>
               </li>
               <li>
                 <Link to="/profile" className="text-slate-300 hover:text-red-500 flex items-center gap-2 transition-colors">
@@ -108,10 +117,9 @@ const Footer = () => {
           <div>
             <h3 className="text-xl font-bold mb-4 text-red-500">Contact Us</h3>
             <address className="not-italic text-slate-300">
-              <p>123 AI Street</p>
-              <p>Imaginarium City, IC 12345</p>
+              <p>Nandur Gaon</p>
+              <p>Nashik 422003</p>
               <p>Email: info@imaginarium.com</p>
-              <p>Phone: (123) 456-7890</p>
             </address>
           </div>
         </div>
@@ -120,7 +128,7 @@ const Footer = () => {
           <p>&copy; {new Date().getFullYear()} Imaginarium. All rights reserved.</p>
           <div className="mt-4 flex justify-center space-x-6">
             <a 
-              href="#pricing" 
+              href="/#pricing" 
               onClick={scrollToPricing}
               className="text-red-500 hover:text-red-400 flex items-center gap-1"
             >

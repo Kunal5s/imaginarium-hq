@@ -1,5 +1,5 @@
 
-import React from 'react';
+import React, { useEffect } from 'react';
 import { Button } from "@/components/ui/button";
 import { Download, Save, ImageIcon } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
@@ -19,6 +19,23 @@ const ImagePreview: React.FC<ImagePreviewProps> = ({
   isGenerating
 }) => {
   const { toast } = useToast();
+  
+  // Auto-save images to gallery when they are generated
+  useEffect(() => {
+    // When new images are generated, save them all to gallery
+    if (generatedImages.length > 0) {
+      generatedImages.forEach(image => {
+        saveImageToGallery(image);
+      });
+      
+      if (generatedImages.length > 0) {
+        toast({
+          title: "Images Saved",
+          description: `${generatedImages.length} image(s) automatically saved to your gallery`,
+        });
+      }
+    }
+  }, [generatedImages, toast]);
   
   const handleSaveToGallery = () => {
     if (!selectedImage) return;

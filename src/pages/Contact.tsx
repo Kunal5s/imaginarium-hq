@@ -36,8 +36,8 @@ const Contact = () => {
                 <div>
                   <h3 className="font-medium">Address</h3>
                   <p className="text-muted-foreground">
-                    123 AI Street<br />
-                    Imaginarium City, IC 12345
+                    Nandur Gaon<br />
+                    Nashik 422003
                   </p>
                 </div>
                 
@@ -47,13 +47,8 @@ const Contact = () => {
                 </div>
                 
                 <div>
-                  <h3 className="font-medium">Phone</h3>
-                  <p className="text-muted-foreground">(123) 456-7890</p>
-                </div>
-                
-                <div>
                   <h3 className="font-medium">Hours</h3>
-                  <p className="text-muted-foreground">Monday - Friday: 9am - 5pm EST</p>
+                  <p className="text-muted-foreground">Monday - Friday: 9am - 5pm IST</p>
                 </div>
               </div>
             </div>
