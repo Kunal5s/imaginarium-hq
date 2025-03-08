@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Check, ExternalLink, Crown } from "lucide-react";
@@ -48,8 +47,8 @@ const PricingSection = () => {
       });
       navigate('/login');
     } else {
-      // Redirect to Buy Me a Coffee with return URL
-      window.location.href = "https://www.buymeacoffee.com/ultracinemabookfeed?redirect_to=https://imaginariumtool.netlify.app/success.html";
+      // Redirect to Buy Me a Coffee membership page with return URL
+      window.location.href = "https://buymeacoffee.com/ultracinemabookfeed/membership?redirect_to=https://imaginariumtool.netlify.app/success.html";
     }
   };
 

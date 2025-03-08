@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import Navbar from "@/components/Navbar";
@@ -103,8 +102,8 @@ const Profile = () => {
   };
 
   const handleRenewClick = () => {
-    // Redirect to Buy Me a Coffee with return URL
-    window.location.href = "https://www.buymeacoffee.com/ultracinemabookfeed?redirect_to=https://imaginariumtool.netlify.app/success.html";
+    // Redirect to Buy Me a Coffee membership page with return URL
+    window.location.href = "https://buymeacoffee.com/ultracinemabookfeed/membership?redirect_to=https://imaginariumtool.netlify.app/success.html";
   };
 
   return (
