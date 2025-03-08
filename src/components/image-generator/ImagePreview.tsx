@@ -20,18 +20,27 @@ const ImagePreview: React.FC<ImagePreviewProps> = ({
 }) => {
   const { toast } = useToast();
   
+  // Auto-select first image when generating completes
+  useEffect(() => {
+    if (generatedImages.length > 0 && !selectedImage) {
+      setSelectedImage(generatedImages[0]);
+    }
+  }, [generatedImages, selectedImage, setSelectedImage]);
+  
   // Auto-save images to gallery when they are generated
   useEffect(() => {
     // When new images are generated, save them all to gallery
     if (generatedImages.length > 0) {
+      let savedCount = 0;
       generatedImages.forEach(image => {
-        saveImageToGallery(image);
+        const saved = saveImageToGallery(image);
+        if (saved) savedCount++;
       });
       
-      if (generatedImages.length > 0) {
+      if (savedCount > 0) {
         toast({
           title: "Images Saved",
-          description: `${generatedImages.length} image(s) automatically saved to your gallery`,
+          description: `${savedCount} image(s) automatically saved to your gallery`,
         });
       }
     }
@@ -155,15 +164,20 @@ const ImagePreview: React.FC<ImagePreviewProps> = ({
                 {generatedImages.map((image, index) => (
                   <div 
                     key={index}
-                    className="relative group aspect-square rounded-lg border overflow-hidden cursor-pointer"
+                    className={`relative group aspect-square rounded-lg border overflow-hidden cursor-pointer ${selectedImage === image ? 'ring-2 ring-primary' : ''}`}
                     onClick={() => setSelectedImage(image)}
                   >
                     <img
                       src={image}
                       alt={`Generated artwork ${index + 1}`}
                       className="w-full h-full object-cover"
+                      onError={(e) => {
+                        console.error(`Error loading image ${index}:`, e);
+                        // Set a placeholder if image fails to load
+                        (e.target as HTMLImageElement).src = "/placeholder.svg";
+                      }}
                     />
-                    <div className={`absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity ${selectedImage === image ? 'ring-2 ring-primary' : ''}`}>
+                    <div className={`absolute inset-0 bg-black/40 flex items-center justify-center ${selectedImage === image ? 'opacity-0' : 'opacity-0 group-hover:opacity-100'} transition-opacity`}>
                       <Button 
                         size="icon" 
                         variant="ghost" 
@@ -186,6 +200,11 @@ const ImagePreview: React.FC<ImagePreviewProps> = ({
                     src={selectedImage}
                     alt="Selected artwork"
                     className="w-full h-full object-contain"
+                    onError={(e) => {
+                      console.error("Error loading selected image:", e);
+                      // Set a placeholder if image fails to load
+                      (e.target as HTMLImageElement).src = "/placeholder.svg";
+                    }}
                   />
                 </div>
               )}
@@ -196,6 +215,11 @@ const ImagePreview: React.FC<ImagePreviewProps> = ({
                 src={generatedImages[0]}
                 alt="Generated artwork"
                 className="w-full h-full object-contain"
+                onError={(e) => {
+                  console.error("Error loading image:", e);
+                  // Set a placeholder if image fails to load
+                  (e.target as HTMLImageElement).src = "/placeholder.svg";
+                }}
               />
               <div className="absolute bottom-4 right-4">
                 <Button 

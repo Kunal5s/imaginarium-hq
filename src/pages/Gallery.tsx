@@ -3,24 +3,82 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
-import { ImageIcon, Trash2 } from "lucide-react";
+import { ImageIcon, Trash2, Clock, Download } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { useToast } from "@/components/ui/use-toast";
+import { useToast } from "@/hooks/use-toast";
+
+interface SavedImage {
+  url: string;
+  timestamp: number;
+}
 
 const Gallery = () => {
-  const [savedImages, setSavedImages] = useState<string[]>([]);
+  const [savedImages, setSavedImages] = useState<SavedImage[]>([]);
   const navigate = useNavigate();
   const { toast } = useToast();
+  
+  // 30 minutes in milliseconds
+  const EXPIRY_TIME = 30 * 60 * 1000;
   
   useEffect(() => {
     // Load images from localStorage
     loadSavedImages();
+    
+    // Set up interval to check for expired images every minute
+    const interval = setInterval(() => {
+      removeExpiredImages();
+    }, 60000);
+    
+    return () => clearInterval(interval);
   }, []);
   
   const loadSavedImages = () => {
     const localImages = localStorage.getItem('generatedImages');
     if (localImages) {
-      setSavedImages(JSON.parse(localImages));
+      try {
+        // Check if the stored data is in the new format (with timestamps)
+        const parsedData = JSON.parse(localImages);
+        
+        if (Array.isArray(parsedData) && typeof parsedData[0] === 'string') {
+          // Old format - convert to new format with current timestamp
+          const currentTime = Date.now();
+          const formattedImages = parsedData.map(url => ({
+            url,
+            timestamp: currentTime
+          }));
+          
+          localStorage.setItem('generatedImages', JSON.stringify(formattedImages));
+          setSavedImages(formattedImages);
+        } else {
+          // New format with timestamps
+          setSavedImages(parsedData);
+        }
+        
+        // Remove any expired images
+        removeExpiredImages();
+      } catch (error) {
+        console.error("Error parsing saved images:", error);
+        setSavedImages([]);
+      }
+    }
+  };
+  
+  const removeExpiredImages = () => {
+    const currentTime = Date.now();
+    const updatedImages = savedImages.filter(image => {
+      return currentTime - image.timestamp < EXPIRY_TIME;
+    });
+    
+    if (updatedImages.length !== savedImages.length) {
+      localStorage.setItem('generatedImages', JSON.stringify(updatedImages));
+      setSavedImages(updatedImages);
+      
+      if (savedImages.length > 0 && updatedImages.length === 0) {
+        toast({
+          title: "Images Expired",
+          description: "All images have expired (30-minute limit reached)",
+        });
+      }
     }
   };
   
@@ -62,6 +120,18 @@ const Gallery = () => {
     }
   };
 
+  const getTimeRemaining = (timestamp: number) => {
+    const currentTime = Date.now();
+    const elapsed = currentTime - timestamp;
+    const remaining = Math.max(0, EXPIRY_TIME - elapsed);
+    
+    // Convert to minutes and seconds
+    const minutes = Math.floor(remaining / 60000);
+    const seconds = Math.floor((remaining % 60000) / 1000);
+    
+    return `${minutes}m ${seconds}s`;
+  };
+
   return (
     <div className="min-h-screen bg-background">
       <Navbar />
@@ -72,29 +142,33 @@ const Gallery = () => {
               Your Generated Artwork
             </h1>
             <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
-              View all your AI-generated images in one place
+              View all your AI-generated images in one place (available for 30 minutes)
             </p>
           </div>
 
           {savedImages.length > 0 ? (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {savedImages.map((imageUrl, index) => (
+              {savedImages.map((image, index) => (
                 <div key={index} className="rounded-lg overflow-hidden border border-border group relative">
                   <img 
-                    src={imageUrl} 
+                    src={image.url} 
                     alt={`Generated artwork ${index + 1}`} 
                     className="w-full aspect-square object-cover transition-transform duration-300 group-hover:scale-105"
                   />
                   <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-end">
                     <div className="p-4 w-full flex justify-between items-center">
-                      <p className="text-white text-sm">Artwork #{index + 1}</p>
+                      <div className="flex items-center space-x-1 text-white text-sm">
+                        <Clock className="h-3 w-3" />
+                        <span>{getTimeRemaining(image.timestamp)}</span>
+                      </div>
                       <div className="flex space-x-2">
                         <Button
                           size="sm"
                           variant="ghost"
                           className="text-white bg-black/40 hover:bg-black/60"
-                          onClick={() => downloadImage(imageUrl, index)}
+                          onClick={() => downloadImage(image.url, index)}
                         >
+                          <Download className="h-4 w-4 mr-1" />
                           Download
                         </Button>
                         <Button

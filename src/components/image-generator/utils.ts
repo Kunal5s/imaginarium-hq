@@ -243,11 +243,47 @@ export const generateImageWithOpenAI = async (
 export const saveImageToGallery = (selectedImage: string) => {
   if (!selectedImage) return false;
   
-  // In a real app, you would save to a database
-  // For now, we'll use localStorage as a demonstration
-  const savedImages = JSON.parse(localStorage.getItem('generatedImages') || '[]');
-  if (!savedImages.includes(selectedImage)) {
-    savedImages.push(selectedImage);
+  // Get current saved images
+  const savedImagesString = localStorage.getItem('generatedImages');
+  let savedImages = [];
+  
+  if (savedImagesString) {
+    try {
+      const parsed = JSON.parse(savedImagesString);
+      
+      // Check if using old format (array of strings) or new format (array of objects)
+      if (Array.isArray(parsed)) {
+        if (parsed.length > 0) {
+          if (typeof parsed[0] === 'string') {
+            // Convert old format to new format
+            savedImages = parsed.map(url => ({
+              url,
+              timestamp: Date.now()
+            }));
+          } else {
+            // Already in new format
+            savedImages = parsed;
+          }
+        }
+      }
+    } catch (e) {
+      console.error("Error parsing saved images:", e);
+      savedImages = [];
+    }
+  }
+  
+  // Check if image already exists
+  const imageExists = savedImages.some(img => 
+    typeof img === 'string' ? img === selectedImage : img.url === selectedImage
+  );
+  
+  if (!imageExists) {
+    // Add new image with timestamp
+    savedImages.push({
+      url: selectedImage,
+      timestamp: Date.now()
+    });
+    
     localStorage.setItem('generatedImages', JSON.stringify(savedImages));
     return true;
   }
@@ -291,7 +327,7 @@ export const downloadImage = async (imageUrl: string, filename: string = "ai-gen
   }
 };
 
-// New function to download multiple images as a zip
+// New function to download multiple images
 export const downloadAllImages = async (imageUrls: string[], baseName: string = "ai-generated-images") => {
   // Not implemented yet - would need JSZip or similar
   // Since we need to keep this function lightweight, return an array of downloaded status
