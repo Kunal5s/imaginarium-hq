@@ -41,14 +41,8 @@ const AppRoutes = () => {
       <Route path="/privacy" element={<Privacy />} />
       <Route path="/cookies" element={<Cookies />} />
       <Route path="/terms" element={<Terms />} />
-      <Route 
-        path="/gallery" 
-        element={
-          <ProtectedRoute>
-            <Gallery />
-          </ProtectedRoute>
-        } 
-      />
+      {/* Making Gallery freely accessible without authentication */}
+      <Route path="/gallery" element={<Gallery />} />
       <Route 
         path="/profile" 
         element={
