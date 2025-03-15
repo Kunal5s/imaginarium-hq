@@ -9,7 +9,54 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
-      [_ in never]: never
+      Imaginarium: {
+        Row: {
+          Content: string | null
+          created_at: string
+          id: number
+        }
+        Insert: {
+          Content?: string | null
+          created_at?: string
+          id?: number
+        }
+        Update: {
+          Content?: string | null
+          created_at?: string
+          id?: number
+        }
+        Relationships: []
+      }
+      users: {
+        Row: {
+          created_at: string | null
+          credits: number | null
+          email: string
+          id: string
+          image_generation_count: number | null
+          last_generated_date: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          credits?: number | null
+          email: string
+          id?: string
+          image_generation_count?: number | null
+          last_generated_date?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          credits?: number | null
+          email?: string
+          id?: string
+          image_generation_count?: number | null
+          last_generated_date?: string | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
