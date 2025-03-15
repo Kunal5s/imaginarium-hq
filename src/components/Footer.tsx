@@ -1,140 +1,98 @@
 
-import React from "react";
 import { Link } from "react-router-dom";
-import { Info, Mail, Shield, Cookie, MoveRight, Github, Twitter, Facebook, Instagram, Crown } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Separator } from "@/components/ui/separator";
+import { Image, Github, Twitter } from "lucide-react";
 
 const Footer = () => {
-  const scrollToPricing = (e: React.MouseEvent) => {
-    e.preventDefault();
-    // Check if we're on the home page
-    if (window.location.pathname === '/') {
-      const pricingSection = document.getElementById('pricing');
-      if (pricingSection) {
-        pricingSection.scrollIntoView({ behavior: 'smooth' });
-      }
-    } else {
-      // If not on homepage, navigate to homepage with pricing section
-      window.location.href = '/#pricing';
-    }
-  };
-
   return (
-    <footer className="bg-black py-12 mt-16 border-t border-red-900/30">
-      <div className="container mx-auto px-4">
+    <footer className="border-t border-gray-800">
+      <div className="container mx-auto px-4 py-12">
         <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
-          <div>
-            <h3 className="text-xl font-bold mb-4 text-red-500">Imaginarium</h3>
-            <p className="text-slate-300">
-              Transform your ideas into beautiful artwork with our state-of-the-art
-              AI image generator.
-            </p>
-            <div className="flex mt-4 space-x-4">
-              <a href="#" className="text-gray-400 hover:text-white">
-                <Twitter className="h-5 w-5" />
-              </a>
-              <a href="#" className="text-gray-400 hover:text-white">
-                <Facebook className="h-5 w-5" />
-              </a>
-              <a href="#" className="text-gray-400 hover:text-white">
-                <Instagram className="h-5 w-5" />
-              </a>
-              <a href="#" className="text-gray-400 hover:text-white">
-                <Github className="h-5 w-5" />
-              </a>
+          <div className="space-y-4">
+            <div className="flex items-center space-x-2">
+              <Image className="h-6 w-6 text-red-500" />
+              <span className="font-bold text-xl">Imaginarium</span>
             </div>
+            <p className="text-muted-foreground text-sm max-w-xs">
+              Create stunning AI-generated images with our cutting-edge technology.
+              Unlock your creativity today!
+            </p>
           </div>
-          
+
           <div>
-            <h3 className="text-xl font-bold mb-4 text-red-500">Quick Links</h3>
-            <ul className="space-y-2">
+            <h3 className="font-medium text-lg mb-4">Product</h3>
+            <ul className="space-y-2 text-sm text-muted-foreground">
               <li>
-                <Link to="/" className="text-slate-300 hover:text-red-500 flex items-center gap-2 transition-colors">
-                  <MoveRight className="h-4 w-4 text-red-700" />
+                <Link to="/" className="hover:text-foreground transition-colors">
                   Home
                 </Link>
               </li>
               <li>
-                <a 
-                  href="/#pricing" 
-                  className="text-slate-300 hover:text-red-500 flex items-center gap-2 transition-colors cursor-pointer"
-                  onClick={scrollToPricing}
-                >
-                  <Crown className="h-4 w-4 text-red-700" />
-                  Pricing
-                </a>
-              </li>
-              <li>
-                <Link to="/gallery" className="text-slate-300 hover:text-red-500 flex items-center gap-2 transition-colors">
-                  <MoveRight className="h-4 w-4 text-red-700" />
+                <Link to="/gallery" className="hover:text-foreground transition-colors">
                   Gallery
                 </Link>
               </li>
               <li>
-                <Link to="/profile" className="text-slate-300 hover:text-red-500 flex items-center gap-2 transition-colors">
-                  <MoveRight className="h-4 w-4 text-red-700" />
-                  My Account
+                <a href="#pricing" className="hover:text-foreground transition-colors">
+                  Pricing
+                </a>
+              </li>
+            </ul>
+          </div>
+
+          <div>
+            <h3 className="font-medium text-lg mb-4">Company</h3>
+            <ul className="space-y-2 text-sm text-muted-foreground">
+              <li>
+                <Link to="/about" className="hover:text-foreground transition-colors">
+                  About
                 </Link>
               </li>
               <li>
-                <Link to="/about" className="text-slate-300 hover:text-red-500 flex items-center gap-2 transition-colors">
-                  <Info className="h-4 w-4 text-red-700" />
-                  About Us
-                </Link>
-              </li>
-              <li>
-                <Link to="/contact" className="text-slate-300 hover:text-red-500 flex items-center gap-2 transition-colors">
-                  <Mail className="h-4 w-4 text-red-700" />
-                  Contact Us
+                <Link to="/contact" className="hover:text-foreground transition-colors">
+                  Contact
                 </Link>
               </li>
             </ul>
           </div>
-          
+
           <div>
-            <h3 className="text-xl font-bold mb-4 text-red-500">Legal</h3>
-            <ul className="space-y-2">
+            <h3 className="font-medium text-lg mb-4">Legal</h3>
+            <ul className="space-y-2 text-sm text-muted-foreground">
               <li>
-                <Link to="/privacy" className="text-slate-300 hover:text-red-500 flex items-center gap-2 transition-colors">
-                  <Shield className="h-4 w-4 text-red-700" />
+                <Link to="/terms" className="hover:text-foreground transition-colors">
+                  Terms of Service
+                </Link>
+              </li>
+              <li>
+                <Link to="/privacy" className="hover:text-foreground transition-colors">
                   Privacy Policy
                 </Link>
               </li>
               <li>
-                <Link to="/cookies" className="text-slate-300 hover:text-red-500 flex items-center gap-2 transition-colors">
-                  <Cookie className="h-4 w-4 text-red-700" />
-                  Cookies Policy
-                </Link>
-              </li>
-              <li>
-                <Link to="/terms" className="text-slate-300 hover:text-red-500 flex items-center gap-2 transition-colors">
-                  <Shield className="h-4 w-4 text-red-700" />
-                  Terms of Service
+                <Link to="/cookies" className="hover:text-foreground transition-colors">
+                  Cookie Policy
                 </Link>
               </li>
             </ul>
           </div>
-          
-          <div>
-            <h3 className="text-xl font-bold mb-4 text-red-500">Contact Us</h3>
-            <address className="not-italic text-slate-300">
-              <p>Nandur Gaon</p>
-              <p>Nashik 422003</p>
-              <p>Email: info@imaginarium.com</p>
-            </address>
-          </div>
         </div>
-        
-        <div className="border-t border-red-900/20 mt-8 pt-8 text-center text-slate-400">
-          <p>&copy; {new Date().getFullYear()} Imaginarium. All rights reserved.</p>
-          <div className="mt-4 flex justify-center space-x-6">
-            <a 
-              href="/#pricing" 
-              onClick={scrollToPricing}
-              className="text-red-500 hover:text-red-400 flex items-center gap-1"
-            >
-              <Crown className="h-4 w-4" />
-              Upgrade to Premium
-            </a>
+
+        <Separator className="my-8" />
+
+        <div className="flex flex-col sm:flex-row justify-between items-center">
+          <p className="text-sm text-muted-foreground">
+            &copy; 2023 Imaginarium. All rights reserved.
+          </p>
+
+          <div className="flex space-x-4 mt-4 sm:mt-0">
+            <Button variant="ghost" size="icon">
+              <Twitter className="h-4 w-4" />
+            </Button>
+            <Button variant="ghost" size="icon">
+              <Github className="h-4 w-4" />
+            </Button>
           </div>
         </div>
       </div>

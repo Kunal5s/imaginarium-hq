@@ -1,23 +1,64 @@
-import { useState } from "react";
+
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Check, ExternalLink, Crown } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
+import { supabase } from "@/integrations/supabase/client";
 
 const PricingSection = () => {
   const { isAuthenticated, user } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
+  const [isPremium, setIsPremium] = useState(false);
+
+  useEffect(() => {
+    // Load Polar checkout script
+    const script = document.createElement('script');
+    script.src = 'https://cdn.jsdelivr.net/npm/@polar-sh/checkout@0.1/dist/embed.global.js';
+    script.defer = true;
+    script.setAttribute('data-auto-init', '');
+    document.body.appendChild(script);
+
+    return () => {
+      document.body.removeChild(script);
+    };
+  }, []);
+
+  useEffect(() => {
+    // Check premium status if user is authenticated
+    const checkPremiumStatus = async () => {
+      if (isAuthenticated && user) {
+        try {
+          const { data, error } = await supabase.functions.invoke('handle-premium', {
+            body: { user_id: user.id, operation: 'check' }
+          });
+          
+          if (error) throw error;
+          
+          if (data?.data?.premium_status === 'active') {
+            setIsPremium(true);
+          } else {
+            setIsPremium(false);
+          }
+        } catch (error) {
+          console.error("Error checking premium status:", error);
+        }
+      }
+    };
+    
+    checkPremiumStatus();
+  }, [isAuthenticated, user]);
 
   // Single premium plan
   const premiumPlan = {
     name: "Premium",
-    price: "₹2600",
-    period: "one-time payment",
+    price: "$30",
+    period: "monthly subscription",
     features: [
       "Unlimited image generation",
-      "Permanent image storage",
+      "2000 credits monthly",
       "Access to all models",
       "High quality resolution",
       "Priority support",
@@ -28,7 +69,7 @@ const PricingSection = () => {
   // Free plan features
   const freePlan = {
     name: "Free",
-    price: "₹0",
+    price: "$0",
     features: [
       "10 images per day",
       "Images saved for 30 minutes",
@@ -46,10 +87,8 @@ const PricingSection = () => {
         description: "Please login to upgrade to the premium plan",
       });
       navigate('/login');
-    } else {
-      // Redirect to Buy Me a Coffee membership page with return URL
-      window.location.href = "https://buymeacoffee.com/ultracinemabookfeed/membership?redirect_to=https://imaginariumtool.netlify.app/success.html";
     }
+    // The actual purchase flow is handled by the Polar checkout button
   };
 
   const scrollToPricing = () => {
@@ -123,13 +162,38 @@ const PricingSection = () => {
                 </li>
               ))}
             </ul>
-            <Button
-              className="mt-8 bg-gradient-to-r from-red-600 to-red-800 hover:from-red-700 hover:to-red-900"
-              onClick={handleUpgradeClick}
-            >
-              Upgrade Now
-              <Crown className="ml-2 h-4 w-4" />
-            </Button>
+            
+            {!isPremium ? (
+              <div className="mt-8">
+                {isAuthenticated ? (
+                  <a 
+                    href="https://buy.polar.sh/polar_cl_dVyO7TWk7jaSbsZCewMHxJXCxRXpea4uCibrk2dATxC" 
+                    data-polar-checkout 
+                    data-polar-checkout-theme="dark"
+                    className="w-full px-4 py-2 bg-gradient-to-r from-red-600 to-red-800 hover:from-red-700 hover:to-red-900 text-white rounded-md flex items-center justify-center"
+                  >
+                    <Crown className="mr-2 h-4 w-4" />
+                    Upgrade Now - $30/month
+                  </a>
+                ) : (
+                  <Button
+                    className="w-full bg-gradient-to-r from-red-600 to-red-800 hover:from-red-700 hover:to-red-900"
+                    onClick={handleUpgradeClick}
+                  >
+                    <Crown className="ml-2 h-4 w-4" />
+                    Login to Upgrade
+                  </Button>
+                )}
+              </div>
+            ) : (
+              <Button
+                className="mt-8 bg-green-700 hover:bg-green-800"
+                disabled
+              >
+                <Crown className="mr-2 h-4 w-4" />
+                Active Premium
+              </Button>
+            )}
           </div>
         </div>
       </div>

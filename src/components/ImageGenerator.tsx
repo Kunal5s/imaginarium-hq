@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { useToast } from "@/hooks/use-toast";
 import GeneratorForm from "./image-generator/GeneratorForm";
@@ -18,6 +19,7 @@ import { useTheme } from "@/hooks/useTheme";
 import { useAuth } from "@/hooks/useAuth";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { useNavigate } from "react-router-dom";
+import { supabase } from "@/integrations/supabase/client";
 
 const ImageGenerator = () => {
   const [prompt, setPrompt] = useState("");
@@ -41,6 +43,7 @@ const ImageGenerator = () => {
 
   const [dailyGenerationCount, setDailyGenerationCount] = useState(0);
   const [isPremium, setIsPremium] = useState(false);
+  const [credits, setCredits] = useState(0);
   const FREE_USER_DAILY_LIMIT = 10;
   
   const { toast } = useToast();
@@ -50,22 +53,35 @@ const ImageGenerator = () => {
 
   useEffect(() => {
     if (isAuthenticated && user) {
-      const hasSubscription = localStorage.getItem(`premium_${user.id}`);
-      if (hasSubscription) {
-        const storedExpiry = localStorage.getItem(`premium_expiry_${user.id}`);
-        if (storedExpiry) {
-          const expiryDate = new Date(storedExpiry);
-          const now = new Date();
+      // Check premium status and credits from Supabase
+      const checkPremiumStatus = async () => {
+        try {
+          const { data, error } = await supabase.functions.invoke('handle-premium', {
+            body: { user_id: user.id, operation: 'check' }
+          });
           
-          if (expiryDate > now) {
-            setIsPremium(true);
-          } else {
-            localStorage.removeItem(`premium_${user.id}`);
-            localStorage.removeItem(`premium_expiry_${user.id}`);
+          if (error) throw error;
+          
+          if (data?.data) {
+            const userStatus = data.data;
+            
+            // Set premium status
+            if (userStatus.premium_status === 'active') {
+              setIsPremium(true);
+              setCredits(userStatus.credits || 0);
+            } else {
+              setIsPremium(false);
+              setCredits(userStatus.credits || 0);
+            }
           }
+        } catch (error) {
+          console.error("Error checking premium status:", error);
         }
-      }
+      };
       
+      checkPremiumStatus();
+      
+      // Get daily usage count
       const storedUsage = localStorage.getItem(`image_usage_${user.id}`);
       if (storedUsage) {
         const { count, date } = JSON.parse(storedUsage);
@@ -85,11 +101,11 @@ const ImageGenerator = () => {
       title: "Welcome to our AI Image Generator!",
       description: isAuthenticated 
         ? isPremium 
-          ? "Create unlimited images with our premium tools!"
+          ? `Create unlimited images with our premium tools! You have ${credits} credits.`
           : "You can generate up to 10 free images daily. Upgrade to premium for unlimited access!" 
         : "Login to access all features and generate up to 10 free images daily!",
     });
-  }, [toast, isAuthenticated, isPremium]);
+  }, [toast, isAuthenticated, isPremium, credits]);
 
   const updateUsageCount = () => {
     if (isAuthenticated && user) {
@@ -140,6 +156,22 @@ const ImageGenerator = () => {
     
     try {
       let images: string[] = [];
+      
+      // If premium user, deduct credits (1 credit per image)
+      if (isPremium && credits > 0) {
+        const creditsToDeduct = Math.min(numberOfImages, credits);
+        
+        if (creditsToDeduct < numberOfImages) {
+          toast({
+            title: "Not enough credits",
+            description: `You only have ${credits} credits. Reducing the number of images to generate.`,
+            variant: "destructive",
+          });
+          
+          // Adjust the number of images to match available credits
+          setNumberOfImages(creditsToDeduct);
+        }
+      }
       
       if (generationMethod === "openai") {
         try {
@@ -223,12 +255,64 @@ const ImageGenerator = () => {
         }
       }
       
+      // Update generated images in both state and localStorage with timestamps
       setGeneratedImages(images);
       if (images.length > 0) {
         setSelectedImage(images[0]);
+        
+        // Save to gallery with timestamps (30 minute expiration)
+        const galleryImages = images.map(url => ({
+          url,
+          timestamp: Date.now(),
+          expiresAt: Date.now() + (30 * 60 * 1000) // 30 minutes
+        }));
+        
+        // Get existing gallery
+        const existingGallery = localStorage.getItem('gallery');
+        let gallery = [];
+        
+        if (existingGallery) {
+          try {
+            gallery = JSON.parse(existingGallery);
+            // Filter out expired images
+            gallery = gallery.filter(item => {
+              return item.expiresAt > Date.now();
+            });
+          } catch (e) {
+            console.error("Error parsing gallery:", e);
+            gallery = [];
+          }
+        }
+        
+        // Add new images to gallery
+        gallery = [...galleryImages, ...gallery];
+        
+        // Save updated gallery
+        localStorage.setItem('gallery', JSON.stringify(gallery));
       }
 
-      updateUsageCount();
+      // Update daily usage for non-premium users
+      if (!isPremium) {
+        updateUsageCount();
+      } else if (isPremium && credits > 0) {
+        // Deduct credits for premium users
+        const creditsUsed = images.length;
+        const remainingCredits = Math.max(0, credits - creditsUsed);
+        setCredits(remainingCredits);
+        
+        // Update credits in Supabase
+        try {
+          await supabase.functions.invoke('handle-premium', {
+            body: { 
+              user_id: user?.id, 
+              operation: 'update_credits',
+              credits: remainingCredits
+            }
+          });
+        } catch (error) {
+          console.error("Error updating credits:", error);
+        }
+      }
 
       toast({
         title: "Success!",
@@ -358,6 +442,9 @@ const ImageGenerator = () => {
         error={error}
         onGenerate={handleGenerate}
         isAuthenticated={isAuthenticated}
+        isPremium={isPremium}
+        credits={credits}
+        dailyGenerationCount={dailyGenerationCount}
       />
 
       {isGenerating && (

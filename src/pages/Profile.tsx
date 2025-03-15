@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import Navbar from "@/components/Navbar";
@@ -5,10 +6,11 @@ import Footer from "@/components/Footer";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { User, Crown, Calendar, Clock, Image, LogOut, Settings, AlertTriangle } from "lucide-react";
+import { User, Crown, Calendar, Clock, Image, LogOut, Settings, AlertTriangle, CreditCard } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { supabase } from "@/integrations/supabase/client";
 
 const Profile = () => {
   const { user, isAuthenticated, logout } = useAuth();
@@ -19,6 +21,8 @@ const Profile = () => {
   const [expiryDate, setExpiryDate] = useState<string | null>(null);
   const [isExpired, setIsExpired] = useState(false);
   const [timeRemaining, setTimeRemaining] = useState<string>("");
+  const [credits, setCredits] = useState(0);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     if (!isAuthenticated) {
@@ -33,49 +37,56 @@ const Profile = () => {
       setDailyUsage(count);
     }
 
-    // Check premium status
-    const checkPremiumStatus = () => {
+    // Check premium status from Supabase
+    const checkPremiumStatus = async () => {
+      setLoading(true);
       try {
-        const premiumStatus = localStorage.getItem(`premiumStatus`);
-        const premiumExpiry = localStorage.getItem(`premiumExpiry`);
+        const { data, error } = await supabase.functions.invoke('handle-premium', {
+          body: { user_id: user?.id, operation: 'check' }
+        });
         
-        if (premiumStatus === "active" && premiumExpiry) {
-          const expiryTimestamp = parseInt(premiumExpiry);
-          const now = new Date().getTime();
+        if (error) throw error;
+        
+        if (data?.data) {
+          const userStatus = data.data;
           
-          // Check if subscription is expired
-          if (expiryTimestamp > now) {
+          // Check if premium is active
+          if (userStatus.premium_status === 'active' && userStatus.premium_expiry) {
             setIsPremium(true);
             setIsExpired(false);
             
             // Format the expiry date
-            const expiryDate = new Date(expiryTimestamp);
+            const expiryDate = new Date(userStatus.premium_expiry);
             setExpiryDate(expiryDate.toLocaleDateString());
             
             // Calculate time remaining
-            const timeRemaining = expiryTimestamp - now;
+            const timeRemaining = new Date(userStatus.premium_expiry).getTime() - new Date().getTime();
             const days = Math.floor(timeRemaining / (1000 * 60 * 60 * 24));
             const hours = Math.floor((timeRemaining % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
             
             setTimeRemaining(`${days} days and ${hours} hours`);
-          } else {
-            // Subscription expired
+            setCredits(userStatus.credits || 0);
+          } else if (userStatus.premium_status === 'expired') {
             setIsPremium(false);
             setIsExpired(true);
             setExpiryDate(null);
-            localStorage.removeItem(`premiumStatus`);
+            setCredits(userStatus.credits || 0);
             
             toast({
               title: "Subscription Expired",
               description: "Your premium plan has expired. Please renew to continue enjoying premium features.",
               variant: "destructive",
             });
+          } else {
+            setIsPremium(false);
+            setIsExpired(false);
+            setCredits(userStatus.credits || 0);
           }
-        } else if (premiumStatus !== "active") {
-          setIsExpired(false);
         }
       } catch (error) {
         console.error("Error checking premium status:", error);
+      } finally {
+        setLoading(false);
       }
     };
 
@@ -86,6 +97,21 @@ const Profile = () => {
     
     return () => clearInterval(interval);
   }, [isAuthenticated, navigate, user, toast]);
+
+  useEffect(() => {
+    // Load Polar checkout script
+    const script = document.createElement('script');
+    script.src = 'https://cdn.jsdelivr.net/npm/@polar-sh/checkout@0.1/dist/embed.global.js';
+    script.defer = true;
+    script.setAttribute('data-auto-init', '');
+    document.body.appendChild(script);
+
+    return () => {
+      if (document.body.contains(script)) {
+        document.body.removeChild(script);
+      }
+    };
+  }, []);
 
   const handleLogout = async () => {
     try {
@@ -99,11 +125,6 @@ const Profile = () => {
         variant: "destructive",
       });
     }
-  };
-
-  const handleRenewClick = () => {
-    // Redirect to Buy Me a Coffee membership page with return URL
-    window.location.href = "https://buymeacoffee.com/ultracinemabookfeed/membership?redirect_to=https://imaginariumtool.netlify.app/success.html";
   };
 
   return (
@@ -146,6 +167,10 @@ const Profile = () => {
                   <Image className="w-4 h-4 text-muted-foreground" />
                   <span>Generated {dailyUsage} images today</span>
                 </div>
+                <div className="flex items-center space-x-2 text-sm">
+                  <CreditCard className="w-4 h-4 text-muted-foreground" />
+                  <span>Credits: {credits}</span>
+                </div>
               </CardContent>
               <CardFooter className="flex flex-col space-y-2">
                 <Button 
@@ -175,7 +200,7 @@ const Profile = () => {
                 </CardTitle>
                 <CardDescription>
                   {isPremium 
-                    ? "You currently have premium access for one week" 
+                    ? "You currently have premium access" 
                     : "Upgrade to Premium for unlimited access"}
                 </CardDescription>
               </CardHeader>
@@ -199,6 +224,15 @@ const Profile = () => {
                     <p className="text-sm text-muted-foreground mb-4">
                       Time remaining: {timeRemaining}
                     </p>
+                    <div className="mb-4 p-3 bg-green-900/20 rounded border border-green-700">
+                      <h4 className="font-medium text-green-400 flex items-center">
+                        <CreditCard className="w-4 h-4 mr-2" />
+                        Credits: {credits}
+                      </h4>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        You have {credits} credits to use for image generation
+                      </p>
+                    </div>
                     <ul className="list-disc list-inside space-y-1 text-sm text-muted-foreground">
                       <li>Unlimited image generation</li>
                       <li>Access to all premium models</li>
@@ -221,12 +255,13 @@ const Profile = () => {
                     </div>
                     
                     <div className="p-4 bg-red-900/20 rounded-lg border border-red-700">
-                      <h3 className="font-medium text-red-400 mb-2">Premium Plan - ₹2600</h3>
+                      <h3 className="font-medium text-red-400 mb-2">Premium Plan - $30/month</h3>
                       <p className="text-sm text-muted-foreground mb-2">
-                        One-time payment for 1 week of premium features:
+                        Monthly subscription with premium features:
                       </p>
                       <ul className="list-disc list-inside space-y-1 text-sm text-muted-foreground">
                         <li>Unlimited image generation</li>
+                        <li>2000 credits monthly</li>
                         <li>Access to all premium models</li>
                         <li>Priority processing</li>
                         <li>Premium support</li>
@@ -237,13 +272,15 @@ const Profile = () => {
               </CardContent>
               <CardFooter>
                 {!isPremium && (
-                  <Button 
-                    className="w-full bg-gradient-to-r from-red-600 to-red-800 hover:from-red-700 hover:to-red-900"
-                    onClick={handleRenewClick}
+                  <a 
+                    href="https://buy.polar.sh/polar_cl_dVyO7TWk7jaSbsZCewMHxJXCxRXpea4uCibrk2dATxC" 
+                    data-polar-checkout 
+                    data-polar-checkout-theme="dark"
+                    className="w-full px-4 py-2 bg-gradient-to-r from-red-600 to-red-800 hover:from-red-700 hover:to-red-900 text-white rounded-md flex items-center justify-center"
                   >
-                    <Crown className="w-4 h-4 mr-2" />
-                    {isExpired ? 'Renew Premium - ₹2600' : 'Upgrade to Premium - ₹2600'}
-                  </Button>
+                    <Crown className="mr-2 h-4 w-4" />
+                    {isExpired ? 'Renew Premium - $30/month' : 'Upgrade to Premium - $30/month'}
+                  </a>
                 )}
                 {isPremium && (
                   <Button 

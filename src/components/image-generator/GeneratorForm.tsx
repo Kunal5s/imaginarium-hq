@@ -2,7 +2,7 @@
 import React, { useEffect } from 'react';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Wand2, Palette, Settings2, AlertTriangle, Crown } from "lucide-react";
+import { Wand2, Palette, Settings2, AlertTriangle, Crown, CreditCard } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import {
@@ -39,6 +39,9 @@ interface GeneratorFormProps {
   error: string | null;
   onGenerate: () => Promise<void>;
   isAuthenticated?: boolean;
+  isPremium?: boolean;
+  credits?: number;
+  dailyGenerationCount?: number;
 }
 
 const GeneratorForm: React.FC<GeneratorFormProps> = ({
@@ -61,7 +64,10 @@ const GeneratorForm: React.FC<GeneratorFormProps> = ({
   setArtStyle,
   error,
   onGenerate,
-  isAuthenticated = false
+  isAuthenticated = false,
+  isPremium = false,
+  credits = 0,
+  dailyGenerationCount = 0
 }) => {
   const navigate = useNavigate();
 
@@ -74,6 +80,24 @@ const GeneratorForm: React.FC<GeneratorFormProps> = ({
     setAspectRatio(availableAspectRatios[0]);
   }, [aiModel, availableAspectRatios, aspectRatio, setAspectRatio]);
 
+  // Load Polar checkout script
+  useEffect(() => {
+    const script = document.createElement('script');
+    script.src = 'https://cdn.jsdelivr.net/npm/@polar-sh/checkout@0.1/dist/embed.global.js';
+    script.defer = true;
+    script.setAttribute('data-auto-init', '');
+    document.body.appendChild(script);
+
+    return () => {
+      if (document.body.contains(script)) {
+        document.body.removeChild(script);
+      }
+    };
+  }, []);
+
+  const FREE_USER_DAILY_LIMIT = 10;
+  const isLimitReached = !isPremium && dailyGenerationCount >= FREE_USER_DAILY_LIMIT;
+
   return (
     <div className="w-full space-y-4">
       {error && (
@@ -81,6 +105,36 @@ const GeneratorForm: React.FC<GeneratorFormProps> = ({
           <AlertTriangle className="h-4 w-4" />
           <AlertTitle>Error</AlertTitle>
           <AlertDescription>{error}</AlertDescription>
+        </Alert>
+      )}
+
+      {isAuthenticated && isPremium && (
+        <Alert className="my-4 border-green-500 bg-green-900/20">
+          <Crown className="h-4 w-4 text-green-500" />
+          <AlertTitle className="text-green-500">Premium Active</AlertTitle>
+          <AlertDescription className="flex items-center">
+            <CreditCard className="h-4 w-4 mr-2 text-green-400" />
+            <span>You have {credits} credits remaining</span>
+          </AlertDescription>
+        </Alert>
+      )}
+
+      {isAuthenticated && !isPremium && isLimitReached && (
+        <Alert variant="destructive" className="my-4 border-red-500 bg-red-900/20">
+          <AlertTriangle className="h-4 w-4" />
+          <AlertTitle>Daily Limit Reached</AlertTitle>
+          <AlertDescription className="space-y-2">
+            <p>You've reached your daily limit of 10 free images.</p>
+            <a
+              href="https://buy.polar.sh/polar_cl_dVyO7TWk7jaSbsZCewMHxJXCxRXpea4uCibrk2dATxC"
+              data-polar-checkout
+              data-polar-checkout-theme="dark"
+              className="inline-block px-4 py-2 mt-2 bg-gradient-to-r from-red-600 to-red-800 hover:from-red-700 hover:to-red-900 text-white rounded-md flex items-center justify-center w-full sm:w-auto"
+            >
+              <Crown className="mr-2 h-4 w-4" />
+              Upgrade to Premium - $30/month
+            </a>
+          </AlertDescription>
         </Alert>
       )}
 
@@ -225,7 +279,7 @@ const GeneratorForm: React.FC<GeneratorFormProps> = ({
 
             <Button
               onClick={onGenerate}
-              disabled={isGenerating}
+              disabled={isGenerating || isLimitReached || !isAuthenticated}
               className="w-full md:w-auto relative overflow-hidden group bg-gradient-to-r from-red-600 to-red-900 hover:from-red-700 hover:to-red-950"
             >
               <span className="flex items-center gap-2">
@@ -266,22 +320,30 @@ const GeneratorForm: React.FC<GeneratorFormProps> = ({
                   </ul>
                 </div>
                 
-                <div className="bg-red-900/20 p-4 rounded-lg mt-4 border border-red-700">
-                  <h3 className="text-lg font-medium mb-2 text-red-400">Premium Plan - Just $30</h3>
-                  <p className="text-sm text-muted-foreground mb-2">
-                    Unlock exclusive features with secure payment:
-                  </p>
-                  <ul className="list-disc list-inside space-y-1 text-sm text-muted-foreground">
-                    <li>Unlimited image generation</li>
-                    <li>Save images permanently</li>
-                    <li>Access to exclusive premium models</li>
-                    <li>Higher resolution outputs</li>
-                    <li>Priority processing</li>
-                  </ul>
-                  <Button className="mt-3 w-full bg-red-700 hover:bg-red-800 text-white">
-                    Upgrade Now - $30 One-time
-                  </Button>
-                </div>
+                {!isPremium && (
+                  <div className="bg-red-900/20 p-4 rounded-lg mt-4 border border-red-700">
+                    <h3 className="text-lg font-medium mb-2 text-red-400">Premium Plan - $30/month</h3>
+                    <p className="text-sm text-muted-foreground mb-2">
+                      Unlock exclusive features with secure payment:
+                    </p>
+                    <ul className="list-disc list-inside space-y-1 text-sm text-muted-foreground">
+                      <li>Unlimited image generation</li>
+                      <li>2000 credits monthly</li>
+                      <li>Access to exclusive premium models</li>
+                      <li>Higher resolution outputs</li>
+                      <li>Priority processing</li>
+                    </ul>
+                    <a
+                      href="https://buy.polar.sh/polar_cl_dVyO7TWk7jaSbsZCewMHxJXCxRXpea4uCibrk2dATxC"
+                      data-polar-checkout
+                      data-polar-checkout-theme="dark"
+                      className="mt-3 w-full px-4 py-2 bg-red-700 hover:bg-red-800 text-white rounded-md flex items-center justify-center"
+                    >
+                      <Crown className="mr-2 h-4 w-4" />
+                      Upgrade Now - $30/month
+                    </a>
+                  </div>
+                )}
               </div>
             </CardContent>
           </Card>
