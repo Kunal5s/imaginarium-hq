@@ -59,36 +59,48 @@ serve(async (req) => {
       
       console.log(`Making request to ${apiUrl} with payload:`, JSON.stringify(payload));
       
-      // Get image from Hugging Face
-      const response = await fetch(apiUrl, {
-        method: "POST",
-        headers: {
-          "Authorization": `Bearer ${huggingFaceApiKey}`,
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify(payload)
-      });
+      // Use a reasonable timeout to prevent hanging requests
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 60000); // 60 second timeout
       
-      // Handle error if the model is not ready or other issues
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error(`Hugging Face API error: ${response.status} - ${errorText}`);
+      try {
+        // Get image from Hugging Face
+        const response = await fetch(apiUrl, {
+          method: "POST",
+          headers: {
+            "Authorization": `Bearer ${huggingFaceApiKey}`,
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify(payload),
+          signal: controller.signal
+        });
         
-        // If model is loading, return special error
-        if (errorText.includes("loading") || errorText.includes("currently loading")) {
-          throw new Error(`Model is still loading. Please try again in a moment. (${model})`);
+        clearTimeout(timeoutId);
+        
+        // Handle error if the model is not ready or other issues
+        if (!response.ok) {
+          const errorText = await response.text();
+          console.error(`Hugging Face API error: ${response.status} - ${errorText}`);
+          
+          // If model is loading, return special error
+          if (errorText.includes("loading") || errorText.includes("currently loading")) {
+            throw new Error(`Model is still loading. Please try again in a moment. (${model})`);
+          }
+          
+          throw new Error(`Hugging Face API error: ${response.status} - ${errorText}`);
         }
         
-        throw new Error(`Hugging Face API error: ${response.status} - ${errorText}`);
+        // Convert the binary response to base64
+        const buffer = await response.arrayBuffer();
+        const base64 = btoa(
+          new Uint8Array(buffer).reduce((data, byte) => data + String.fromCharCode(byte), '')
+        );
+        
+        return `data:image/jpeg;base64,${base64}`;
+      } catch (error) {
+        clearTimeout(timeoutId);
+        throw error;
       }
-      
-      // Convert the binary response to base64
-      const buffer = await response.arrayBuffer();
-      const base64 = btoa(
-        new Uint8Array(buffer).reduce((data, byte) => data + String.fromCharCode(byte), '')
-      );
-      
-      return `data:image/jpeg;base64,${base64}`;
     };
 
     if (!openAIApiKey && generationMethod === "openai") {
@@ -105,17 +117,35 @@ serve(async (req) => {
       try {
         // Generate multiple images in parallel if needed
         const imagePromises = [];
-        const sanitizedN = Math.min(Math.max(1, n), 6); // Limit to 6 images max
+        const sanitizedN = Math.min(Math.max(1, n), 4); // Limit to 4 images max to prevent overload
         
         for (let i = 0; i < sanitizedN; i++) {
+          // Add a small delay between requests to prevent rate limiting
+          if (i > 0) {
+            await new Promise(resolve => setTimeout(resolve, 300));
+          }
           imagePromises.push(generateWithHuggingFace(prompt, model, aspectRatio));
         }
         
-        const results = await Promise.all(imagePromises);
-        console.log(`Successfully generated ${results.length} images with Hugging Face`);
+        // Use Promise.allSettled instead of Promise.all to prevent one failure from failing all
+        const results = await Promise.allSettled(imagePromises);
+        const successfulImages = results
+          .filter(result => result.status === 'fulfilled')
+          .map(result => (result as PromiseFulfilledResult<string>).value);
+        
+        if (successfulImages.length === 0) {
+          // If all attempts failed, throw the first error
+          const firstError = results.find(result => result.status === 'rejected');
+          if (firstError && firstError.status === 'rejected') {
+            throw (firstError as PromiseRejectedResult).reason;
+          }
+          throw new Error(`Failed to generate any images with model ${model}`);
+        }
+        
+        console.log(`Successfully generated ${successfulImages.length} images with Hugging Face`);
         
         return new Response(
-          JSON.stringify({ imageUrls: results }),
+          JSON.stringify({ imageUrls: successfulImages }),
           {
             headers: { ...corsHeaders, 'Content-Type': 'application/json' },
           }

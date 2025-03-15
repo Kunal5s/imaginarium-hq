@@ -1,6 +1,6 @@
 
 import { useState, useEffect } from "react";
-import { useToast } from "@/hooks/use-toast";
+import { useToast } from "@/components/ui/use-toast";
 import GeneratorForm from "./image-generator/GeneratorForm";
 import ImagePreview from "./image-generator/ImagePreview";
 import { 
@@ -39,7 +39,7 @@ const ImageGenerator = () => {
   const [retryCount, setRetryCount] = useState(0);
   const [isDownloading, setIsDownloading] = useState(false);
   
-  const huggingFaceApiKey = "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";
+  const huggingFaceApiKey = "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";
 
   const [dailyGenerationCount, setDailyGenerationCount] = useState(0);
   const [isPremium, setIsPremium] = useState(false);
@@ -92,6 +92,9 @@ const ImageGenerator = () => {
           localStorage.setItem(`image_usage_${user.id}`, JSON.stringify({ count: 0, date: today }));
           setDailyGenerationCount(0);
         }
+      } else {
+        // Initialize usage tracking if it doesn't exist
+        localStorage.setItem(`image_usage_${user.id}`, JSON.stringify({ count: 0, date: new Date().toDateString() }));
       }
     }
   }, [isAuthenticated, user]);
@@ -173,85 +176,66 @@ const ImageGenerator = () => {
         }
       }
       
-      if (generationMethod === "openai") {
-        try {
-          images = await generateImageWithOpenAI(
-            prompt.trim(), 
-            imageSize, 
-            numberOfImages,
-            setGenerationProgress
-          );
-        } catch (err) {
-          console.error("OpenAI generation failed:", err);
-          toast({
-            title: "OpenAI generation failed",
-            description: "Falling back to Hugging Face models.",
-            variant: "destructive",
-          });
-          
-          setGenerationMethod("huggingface");
-        }
-      }
+      // Try up to 2 times if generation fails
+      let attempts = 0;
+      const maxAttempts = 2;
       
-      if (generationMethod === "huggingface" || images.length === 0) {
-        let enhancedPrompt = prompt.trim();
-        if (artStyle) {
-          enhancedPrompt = `${enhancedPrompt}, in the style of ${artStyle}, high quality, detailed, 8k resolution`;
-        }
-
+      while (attempts < maxAttempts && images.length === 0) {
         try {
-          images = await generateImageWithHuggingFace(
-            enhancedPrompt, 
-            aiModel, 
-            huggingFaceApiKey,
-            aspectRatio,
-            numberOfImages,
-            imageQuality,
-            setGenerationProgress
-          );
-          
-          if (images.length < numberOfImages) {
-            console.log(`Only generated ${images.length}/${numberOfImages} images, attempting to get more...`);
-            
-            const remainingCount = numberOfImages - images.length;
-            if (remainingCount > 0) {
-              const moreImages = await generateImageWithHuggingFace(
-                enhancedPrompt, 
-                aiModel, 
-                huggingFaceApiKey,
-                aspectRatio,
-                remainingCount,
-                imageQuality,
-                setGenerationProgress
-              );
-              
-              images = [...images, ...moreImages];
+          if (generationMethod === "openai") {
+            images = await generateImageWithOpenAI(
+              prompt.trim(), 
+              imageSize, 
+              numberOfImages,
+              setGenerationProgress
+            );
+          } else {
+            let enhancedPrompt = prompt.trim();
+            if (artStyle) {
+              enhancedPrompt = `${enhancedPrompt}, in the style of ${artStyle}, high quality, detailed, 8k resolution`;
             }
-          }
-        } catch (error) {
-          console.error('Error in primary model, trying fallback:', error);
-          
-          if (retryCount === 0) {
-            setRetryCount(1);
-            const fallbackModel = getFallbackModel(aiModel);
-            
-            toast({
-              title: "Trying alternative model",
-              description: "The selected model is currently unavailable. Trying a more reliable model.",
-            });
+
+            // Apply a random noise to the prompt to avoid identical results on retries
+            if (attempts > 0) {
+              enhancedPrompt += ` seed:${Math.floor(Math.random() * 1000000)}`;
+            }
+
+            // If it's a retry, try a more reliable model
+            const modelToUse = attempts > 0 ? getFallbackModel(aiModel) : aiModel;
             
             images = await generateImageWithHuggingFace(
               enhancedPrompt, 
-              fallbackModel, 
+              modelToUse, 
               huggingFaceApiKey,
               aspectRatio,
               numberOfImages,
               imageQuality,
               setGenerationProgress
             );
-          } else {
+          }
+          
+          // Break the loop if we have images
+          if (images.length > 0) {
+            break;
+          }
+        } catch (error) {
+          console.error(`Attempt ${attempts + 1} failed:`, error);
+          if (attempts === maxAttempts - 1) {
             throw error;
           }
+        }
+        
+        attempts++;
+        
+        // If first attempt fails, show a toast message about retrying
+        if (attempts === 1 && images.length === 0) {
+          toast({
+            title: "Retrying with a different model",
+            description: "The first attempt failed. Trying again with a more reliable model.",
+          });
+          
+          // Use a more reliable model for the retry
+          setAiModel(getFallbackModel(aiModel));
         }
       }
       
@@ -323,7 +307,7 @@ const ImageGenerator = () => {
       setError(error.message || "Failed to generate image");
       toast({
         title: "Error",
-        description: `Failed to generate images. Please try a different model or prompt.`,
+        description: `Failed to generate images. Please try again with a different model or prompt.`,
         variant: "destructive",
       });
     } finally {
