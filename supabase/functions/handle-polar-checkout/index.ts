@@ -24,7 +24,7 @@ serve(async (req) => {
       accessToken: POLAR_ACCESS_TOKEN,
     });
 
-    // Create a checkout session
+    // Create a checkout session with the provided product ID
     const checkout = await polar.checkouts.create({
       productId: "58e1c9e3-f2ad-48aa-b255-a095d11e05ec",
     });
