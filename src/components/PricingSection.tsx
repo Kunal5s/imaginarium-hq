@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Check, ExternalLink, Crown } from "lucide-react";
@@ -12,22 +11,9 @@ const PricingSection = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
   const [isPremium, setIsPremium] = useState(false);
+  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    // Load Polar checkout script
-    const script = document.createElement('script');
-    script.src = 'https://cdn.jsdelivr.net/npm/@polar-sh/checkout@0.1/dist/embed.global.js';
-    script.defer = true;
-    script.setAttribute('data-auto-init', '');
-    document.body.appendChild(script);
-
-    return () => {
-      document.body.removeChild(script);
-    };
-  }, []);
-
-  useEffect(() => {
-    // Check premium status if user is authenticated
     const checkPremiumStatus = async () => {
       if (isAuthenticated && user) {
         try {
@@ -51,7 +37,6 @@ const PricingSection = () => {
     checkPremiumStatus();
   }, [isAuthenticated, user]);
 
-  // Single premium plan
   const premiumPlan = {
     name: "Premium",
     price: "$30",
@@ -66,7 +51,6 @@ const PricingSection = () => {
     ],
   };
 
-  // Free plan features
   const freePlan = {
     name: "Free",
     price: "$0",
@@ -79,16 +63,34 @@ const PricingSection = () => {
     ],
   };
 
-  const handleUpgradeClick = () => {
+  const handleUpgradeClick = async () => {
     if (!isAuthenticated) {
-      // Redirect to login if not authenticated
       toast({
         title: "Login Required",
         description: "Please login to upgrade to the premium plan",
       });
       navigate('/login');
+      return;
     }
-    // The actual purchase flow is handled by the Polar checkout button
+
+    try {
+      setLoading(true);
+      const { data, error } = await supabase.functions.invoke('handle-polar-checkout');
+      
+      if (error) throw new Error(error.message);
+      if (!data || !data.url) throw new Error("Checkout URL not received");
+      
+      window.location.href = data.url;
+    } catch (error) {
+      console.error("Error starting checkout:", error);
+      toast({
+        title: "Checkout Error",
+        description: "Unable to start checkout process. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
   };
 
   const scrollToPricing = () => {
@@ -111,7 +113,6 @@ const PricingSection = () => {
         </div>
         
         <div className="mx-auto mt-16 grid max-w-lg grid-cols-1 gap-6 sm:mt-20 lg:mx-0 lg:max-w-none lg:grid-cols-2">
-          {/* Free Plan */}
           <div className="relative flex flex-col p-8 ring-1 ring-muted rounded-3xl backdrop-blur-sm bg-black/40 border border-gray-800">
             <div className="mb-8">
               <h3 className="text-lg font-semibold leading-8">{freePlan.name}</h3>
@@ -138,7 +139,6 @@ const PricingSection = () => {
             </Button>
           </div>
 
-          {/* Premium Plan */}
           <div className="relative flex flex-col p-8 ring-2 ring-red-700 rounded-3xl backdrop-blur-sm bg-black/40 border border-red-800 red-glow">
             <span className="absolute -top-4 left-1/2 -translate-x-1/2 px-4 py-1 text-sm font-medium tracking-wide text-white bg-red-700 rounded-full">
               Recommended
@@ -166,21 +166,20 @@ const PricingSection = () => {
             {!isPremium ? (
               <div className="mt-8">
                 {isAuthenticated ? (
-                  <a 
-                    href="https://buy.polar.sh/polar_cl_dVyO7TWk7jaSbsZCewMHxJXCxRXpea4uCibrk2dATxC" 
-                    data-polar-checkout 
-                    data-polar-checkout-theme="dark"
-                    className="w-full px-4 py-2 bg-gradient-to-r from-red-600 to-red-800 hover:from-red-700 hover:to-red-900 text-white rounded-md flex items-center justify-center"
+                  <Button
+                    onClick={handleUpgradeClick}
+                    disabled={loading}
+                    className="w-full bg-gradient-to-r from-red-600 to-red-800 hover:from-red-700 hover:to-red-900 text-white"
                   >
                     <Crown className="mr-2 h-4 w-4" />
-                    Upgrade Now - $30/month
-                  </a>
+                    {loading ? 'Processing...' : 'Upgrade Now - $30/month'}
+                  </Button>
                 ) : (
                   <Button
                     className="w-full bg-gradient-to-r from-red-600 to-red-800 hover:from-red-700 hover:to-red-900"
                     onClick={handleUpgradeClick}
                   >
-                    <Crown className="ml-2 h-4 w-4" />
+                    <Crown className="mr-2 h-4 w-4" />
                     Login to Upgrade
                   </Button>
                 )}

@@ -98,21 +98,8 @@ const Profile = () => {
     return () => clearInterval(interval);
   }, [isAuthenticated, navigate, user, toast]);
 
-  useEffect(() => {
-    // Load Polar checkout script
-    const script = document.createElement('script');
-    script.src = 'https://cdn.jsdelivr.net/npm/@polar-sh/checkout@0.1/dist/embed.global.js';
-    script.defer = true;
-    script.setAttribute('data-auto-init', '');
-    document.body.appendChild(script);
-
-    return () => {
-      if (document.body.contains(script)) {
-        document.body.removeChild(script);
-      }
-    };
-  }, []);
-
+  // Remove the Polar script loading effect - we'll handle checkout via our edge function
+  
   const handleLogout = async () => {
     try {
       await logout();
@@ -122,6 +109,25 @@ const Profile = () => {
       toast({
         title: "Error",
         description: "Failed to log out. Please try again.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handlePolarCheckout = async () => {
+    try {
+      const { data, error } = await supabase.functions.invoke('handle-polar-checkout');
+      
+      if (error) throw new Error(error.message);
+      if (!data || !data.url) throw new Error("Checkout URL not received");
+      
+      // Redirect to the checkout URL
+      window.location.href = data.url;
+    } catch (error) {
+      console.error("Error starting checkout:", error);
+      toast({
+        title: "Checkout Error",
+        description: "Unable to start checkout process. Please try again.",
         variant: "destructive",
       });
     }
@@ -272,15 +278,13 @@ const Profile = () => {
               </CardContent>
               <CardFooter>
                 {!isPremium && (
-                  <a 
-                    href="https://buy.polar.sh/polar_cl_dVyO7TWk7jaSbsZCewMHxJXCxRXpea4uCibrk2dATxC" 
-                    data-polar-checkout 
-                    data-polar-checkout-theme="dark"
+                  <Button 
+                    onClick={handlePolarCheckout}
                     className="w-full px-4 py-2 bg-gradient-to-r from-red-600 to-red-800 hover:from-red-700 hover:to-red-900 text-white rounded-md flex items-center justify-center"
                   >
                     <Crown className="mr-2 h-4 w-4" />
                     {isExpired ? 'Renew Premium - $30/month' : 'Upgrade to Premium - $30/month'}
-                  </a>
+                  </Button>
                 )}
                 {isPremium && (
                   <Button 
